@@ -1,0 +1,4 @@
+{"segment": 1, "event": "start", "host_id": "vm", "pid": 368, "start": "2026-11-18T18:58:19Z", "steps_start": 0, "recovered_from": "gen4-mem-g997-s2/0000000000", "prev_end": null}
+{"segment": 1, "event": "end", "end": "2026-11-18T19:43:25Z", "end_reason": "segment_done", "end_confirmed": true, "steps_start": 0, "steps_end": 30932992, "lost_time_s": 0, "peak_rss_mb": 96.9, "checkpoint": "gen4-mem-g997-s2/0030932992"}
+{"segment": 2, "event": "start", "host_id": "vm", "pid": 324, "start": "2026-11-18T19:58:49Z", "steps_start": 30932992, "recovered_from": "gen4-mem-g997-s2/0030932992", "prev_end": {"reason": "segment_done", "confirmed": true, "lost_time_s": 0.0}}
+{"segment": 2, "event": "end", "end": "2026-11-18T20:14:16Z", "end_reason": "budget_exhausted", "end_confirmed": true, "steps_start": 30932992, "steps_end": 40009728, "lost_time_s": 0, "peak_rss_mb": 98.6, "checkpoint": "gen4-mem-g997-s2/0040009728"}

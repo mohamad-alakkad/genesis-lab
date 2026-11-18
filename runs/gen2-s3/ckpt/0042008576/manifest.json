@@ -1,0 +1,49 @@
+{
+ "schema": "genesis.manifest/1",
+ "run_id": "gen2-s3",
+ "checkpoint_id": "gen2-s3/0042008576",
+ "parent": null,
+ "global_step": 42008576,
+ "wall_clock_trained_s": 3342.5,
+ "created_at": "2026-11-18T16:10:55Z",
+ "files": [
+  {
+   "path": "model.npz",
+   "sha256": "c6e050e7cc80d4d2d103824d3a8ddefcb6d1e2b93239a421d86b4b6c3e0f9ab5",
+   "size": 1384164
+  },
+  {
+   "path": "state.json",
+   "sha256": "70845359dfde4db5f4f1f705a990a844d5cbb3d0f816e5343e5a18a1a0effaca",
+   "size": 2587
+  }
+ ],
+ "config_hash": "sha256:5362da38942bdc25b5fcd9b8f20c040670e555ac629988b2a327e7ad660ed859",
+ "world_spec_version": "2.0.0",
+ "code_commit": "019a40e",
+ "code_dirty": false,
+ "dependencies": {
+  "python": "3.11.18",
+  "numpy": "2.4.6"
+ },
+ "verified": true,
+ "last_known_good": "gen2-s3/0040009728",
+ "milestones": [
+  "best"
+ ],
+ "eval_summary": {
+  "suite": "heldout-standard",
+  "step": 42008576,
+  "score": 735.59,
+  "score_ci95": [
+   633.2434,
+   837.9366
+  ],
+  "food_mean": 14.24,
+  "survived": 0.22,
+  "caught": 0.7,
+  "shelter_when_threat": 0.0138,
+  "hazard": 1.67,
+  "episodes": 100
+ }
+}

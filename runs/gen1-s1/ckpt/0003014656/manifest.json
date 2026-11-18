@@ -1,0 +1,47 @@
+{
+ "schema": "genesis.manifest/1",
+ "run_id": "gen1-s1",
+ "checkpoint_id": "gen1-s1/0003014656",
+ "parent": null,
+ "global_step": 3014656,
+ "wall_clock_trained_s": 1084.6,
+ "created_at": "2026-11-18T14:52:52Z",
+ "files": [
+  {
+   "path": "model.npz",
+   "sha256": "ad25fabacc4df95c0c68f8163391cb822f8875814a1c53f7466e7d30d9db22cd",
+   "size": 352708
+  },
+  {
+   "path": "state.json",
+   "sha256": "924755b527e605a70ba12f78cb84ab187dedb98205ddc0fa8b9346e580d8bb8f",
+   "size": 2410
+  }
+ ],
+ "config_hash": "sha256:5465c454fc277ec74eacc36c59b4444fe109896334ca2dbe8d7d84308fe42bd6",
+ "world_spec_version": "1.0.0",
+ "code_commit": "dc46f38",
+ "code_dirty": false,
+ "dependencies": {
+  "python": "3.11.18",
+  "numpy": "2.4.6"
+ },
+ "verified": true,
+ "last_known_good": "gen1-s1/0002654208",
+ "milestones": [
+  "best"
+ ],
+ "eval_summary": {
+  "suite": "heldout-standard",
+  "step": 3014656,
+  "food_mean": 27.66,
+  "food_ci95": [
+   25.9817,
+   29.3383
+  ],
+  "survived": 0.82,
+  "ticks": 936.08,
+  "hazard": 5.16,
+  "episodes": 100
+ }
+}

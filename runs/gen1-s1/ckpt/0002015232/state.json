@@ -1,0 +1,151 @@
+{
+ "global_step": 2015232,
+ "episodes": 2815,
+ "segments": 1,
+ "wall_trained_s": 714.7182893753052,
+ "updates": 123,
+ "best": {
+  "suite": "heldout-standard",
+  "step": 2015232,
+  "food_mean": 26.88,
+  "food_ci95": [
+   25.1469,
+   28.6131
+  ],
+  "survived": 0.84,
+  "ticks": 926.07,
+  "hazard": 4.81,
+  "episodes": 100,
+  "checkpoint_id": "gen1-s1/0002015232"
+ },
+ "evals": 3,
+ "since_best": 0,
+ "consec_target": 0,
+ "init_seed": 1,
+ "interruptions": 0,
+ "lost_time_s": 0.0,
+ "milestones_done": [
+  "step0",
+  "early"
+ ],
+ "eval_latest": {
+  "suite": "heldout-standard",
+  "step": 2015232,
+  "food_mean": 26.88,
+  "food_ci95": [
+   25.1469,
+   28.6131
+  ],
+  "survived": 0.84,
+  "ticks": 926.07,
+  "hazard": 4.81,
+  "episodes": 100
+ },
+ "ckpt_overhead_s": 0.20677709579467773,
+ "last_publish": {
+  "checkpoint_id": "gen1-s1/0001015808",
+  "commit": "d113eb491e6cdc81d6895b76978b792e48a17a43",
+  "published_at": "2026-11-18T14:43:22Z"
+ },
+ "config": {
+  "n_envs": 128,
+  "n_steps": 128,
+  "epochs": 4,
+  "minibatch": 2048,
+  "lr": 0.0003,
+  "gamma": 0.99,
+  "lam": 0.95,
+  "clip": 0.2,
+  "ent_coef": 0.01,
+  "vf_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "hidden": [
+   64,
+   64
+  ],
+  "total_steps": 60000000,
+  "segment_minutes": 20.0,
+  "ckpt_minutes": 4,
+  "first_ckpt_s": 45,
+  "publish_minutes": 8,
+  "heartbeat_s": 30,
+  "eval_every_steps": 1000000,
+  "eval_episodes": 100,
+  "target_survival": 0.85,
+  "plateau_evals": 8,
+  "plateau_eps": 0.2,
+  "seed": 1,
+  "rss_soft_mb": 1400,
+  "rss_hard_mb": 1600,
+  "host_min_avail_frac": 0.1,
+  "milestone_steps": {
+   "early": 1000000
+  }
+ },
+ "rng": {
+  "seed": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 227769614583585048188701056627386822254,
+    "inc": 75832438150325598680414078138474848963
+   },
+   "has_uint32": 0,
+   "uinteger": 3348342514
+  },
+  "act": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 180713138995494058697868730776791310263,
+    "inc": 63306644816639285970073607820614806277
+   },
+   "has_uint32": 1,
+   "uinteger": 1320596803
+  }
+ },
+ "adam_t": 3936,
+ "norm_count": 2015232.0001,
+ "arch": {
+  "pi.W0": [
+   42,
+   64
+  ],
+  "pi.W1": [
+   64,
+   64
+  ],
+  "pi.W2": [
+   64,
+   6
+  ],
+  "pi.b0": [
+   64
+  ],
+  "pi.b1": [
+   64
+  ],
+  "pi.b2": [
+   6
+  ],
+  "v.W0": [
+   42,
+   64
+  ],
+  "v.W1": [
+   64,
+   64
+  ],
+  "v.W2": [
+   64,
+   1
+  ],
+  "v.b0": [
+   64
+  ],
+  "v.b1": [
+   64
+  ],
+  "v.b2": [
+   1
+  ]
+ }
+}

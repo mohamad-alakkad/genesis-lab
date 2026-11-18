@@ -1,0 +1,4 @@
+{"suite": "heldout-standard", "step": 0, "food_mean": 0.08, "food_ci95": [0.0266, 0.1334], "survived": 0.0, "ticks": 170.6, "hazard": 0.18, "episodes": 100}
+{"suite": "heldout-standard", "step": 1015808, "food_mean": 25.89, "food_ci95": [24.0872, 27.6928], "survived": 0.82, "ticks": 924.36, "hazard": 2.3, "episodes": 100}
+{"suite": "heldout-standard", "step": 2015232, "food_mean": 26.88, "food_ci95": [25.1469, 28.6131], "survived": 0.84, "ticks": 926.07, "hazard": 4.81, "episodes": 100}
+{"suite": "heldout-standard", "step": 3014656, "food_mean": 27.66, "food_ci95": [25.9817, 29.3383], "survived": 0.82, "ticks": 936.08, "hazard": 5.16, "episodes": 100}

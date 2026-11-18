@@ -147,3 +147,29 @@ def fetch(run_dir_parent: Path, log=print):
         return run_id, latest["checkpoint_id"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def remote_summary(branch, remote=None):
+    """One-line summary of a store branch (shallow clone; no local state touched)."""
+    remote = remote or config()[0]
+    tmp = Path(tempfile.mkdtemp(prefix="genesis-rs-"))
+    try:
+        r = subprocess.run(["git", "clone", "-q", "--depth", "1", "--branch", branch, remote, str(tmp / "s")],
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            return f"{branch}: not published yet"
+        s = tmp / "s"
+        latest = json.loads((s / "latest.json").read_text())
+        rd = s / "runs" / latest["run_id"]
+        hb = json.loads((rd / "heartbeat.json").read_text()) if (rd / "heartbeat.json").exists() else {}
+        ev = [json.loads(l) for l in (rd / "eval_history.jsonl").read_text().splitlines() if l.strip()] if (rd / "eval_history.jsonl").exists() else []
+        ce = json.loads((rd / "CLEAN_EXIT").read_text()) if (rd / "CLEAN_EXIT").exists() else None
+        age = time.time() - hb.get("updated_ts", 0)
+        e0, el = (ev[0], ev[-1]) if ev else ({}, {})
+        key = "score" if "score" in el else "food_mean"
+        best = max((x.get(key, 0) for x in ev), default=None)
+        return (f"{latest['run_id']}: step {hb.get('global_step', 0):,}, {hb.get('steps_per_sec', '?')} sps, heartbeat {age/60:.0f} min ago"
+                f", eval {key} {e0.get(key)} -> {el.get(key)} (best {best}) caught {el.get('caught')}"
+                f", {'clean exit: ' + str(ce.get('end_reason')) if ce else 'running or interrupted'}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)

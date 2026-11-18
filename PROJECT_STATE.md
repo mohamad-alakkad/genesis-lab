@@ -1,46 +1,48 @@
 # GENESIS — Project state
 
-**Updated:** 2026-11-18 · **Phase:** W4→W5 (pipeline validated locally; first Claude Cloud cycle) · **Next action:** check the cloud probe run (RemoteTrigger list_runs) and `git ls-remote origin 'genesis-store-*'`
+**Updated:** 2026-11-18 15:00Z · **Phase:** W5 gen2 autonomous cloud training · W9 started (JS v1 port done; v2 port next)
+**Next action:** `python -m genesis status --remote genesis-store-gen2-s1,genesis-store-gen2-s2,genesis-store-gen2-s3,genesis-store-gen2-s4` (one call, no polling)
 
 ## Commands
-- CLI: `python -m genesis <train|resume|stop|status|evaluate|export|diagnose|publish|fetch>`
-- Tests: `python -m pytest -q` (15 tests: world, PPO gradient check, checkpoints, export isolation)
-- Cloud cycle: `bash cloud/cycle.sh <minutes> <seeds…>` then `bash cloud/wait.sh` until `ALL_DONE` (see `cloud/BRIEF.md`)
-- Memory-limit wrapper (this server only): `python -m genesis.jobguard -- <cmd>`; the detached launch path uses it automatically
+- CLI: `python -m genesis <train|resume|stop|status [--remote branches]|evaluate|export|diagnose|publish|fetch>`
+- Tests: `python -m pytest -q` (18) · JS parity: `cd web && node --test test/parity.test.mjs test/policy.test.mjs` (fixtures: `python -m genesis.fixtures --policy <ckpt_dir>`)
+- Cloud cycle: `bash cloud/cycle.sh <min> <seeds>` → `bash cloud/wait.sh` until ALL_DONE (`cloud/BRIEF.md`)
+- Server memory guard (only if the user authorizes server compute): `python -m genesis.jobguard -- <cmd>`
 
-## Resources (measured, W1)
-- Server: Windows Server 2019 · 4 logical CPUs (GENESIS allowance 2) · RAM 7.24 GB total / 3.7–4.4 GB free · Disk free 34.9 GB · Python 3.12.3, numpy 2.5.3, psutil 7.2.2, no torch
-- **GENESIS RAM budget: 2 GB hard. OS limit: 1800 MB via Windows Job Object (+BELOW_NORMAL, affinity 2 cores); over-allocation test PASSED 2026-11-18 (2.5 GB attempt stopped at 1.7 GB, MemoryError)**
-- Egress: GitHub y (SSH auth ok), PyPI y, HF y, S3 y · Credentials: no HF/AWS/GH tokens (names only checked)
-- Background survival on the server: probe pid 7828 started 2026-11-18 14:17Z (`runs/probe/heartbeat.json`): pending
-- Throughput (server, 1 core, 128 envs incl. PPO updates): 3.4k steps/s · Peak RSS 54 MB
-- **Compute policy (user, 2026-11-18): training in Claude Code Cloud only; no GitHub Actions compute; no server training without explicit authorization.**
-- Cloud sandbox capabilities: pending the probe (cpus, RAM, session length, push to `genesis-store-*`)
+## Resources (measured)
+- Server: Win Server 2019, 4 CPU, 7.24 GB RAM (3.7–4.4 free), 34.9 GB disk. **Job Object 1800 MB verified** (2.5 GB alloc stopped at 1.7 GB). Probe pid 7828 (heartbeat survival) started 14:17Z: check `runs/probe/heartbeat.json`
+- **Compute policy (user): Claude Code Cloud only; no GitHub Actions; no server training without explicit authorization.**
+- Cloud sandbox (measured cycle-01): 4 CPU, 16 GB RAM, 30 GB disk, Python 3.11, git push to any non-main branch OK, survived ≥ 20 min; v1 ≈ 2.1–3.3k steps/s per process with 2 in parallel
 
 ## Persistence
-- Channel: branch `genesis-store-s<seed>` on github.com/mohamad-alakkad/genesis-lab (**public repo**), one orphan commit force-pushed, verified by remote hash and SHA-256 on fetch
-- Local round-trip verified against a bare test repo (2026-11-18). GitHub round-trip: pending the first cloud cycle
+- Store branches on github.com/mohamad-alakkad/genesis-lab (**public**): `genesis-store-<lineage>-s<seed>` (gen1 = `genesis-store-s1/s2`). One orphan commit, verified by remote hash, SHA-256 on fetch
+- GitHub round-trip from the cloud: verified (cycle-01 published every 8 min)
 
 ## Training
-- Active run: none locally. Validation run `t-short` (server, 400k steps, before the cloud directive): held-out food 0.13 → 6.63 [4.87, 8.40]
-- Baselines (standard, 100 episodes): random food 0.26, ticks 175 · heuristic food 3.38, ticks 356
+- **gen1 (world v1.0.0, tag `v1-baseline`)**: 3.28M steps per seed in a 20-min cloud cycle. Held-out food: s1 0.08 → 27.66, s2 0.30 → 29.05 (heuristic 3.38, random 0.26). Learned strongly; kept as the reproducible baseline
+- **gen2 (world v2.0.0, living world)**: hourly routine `trig_01WshMDVj5EGSv1gd6EpsKfE` (cron :57), 45-min cycles, seeds 1–4, 60M steps/seed, first run 14:57Z
+- gen2 baselines (standard, 40 episodes, survival ticks/caught): random 296/0.25 · forager 394/0.80 · survivor 711/0.40. No predator: forager survives 1196 ticks (55% to the cap)
 
-## Gates (evidence pointers)
-- [x] Stage A — `pytest -q` 15 passed; 3.4k steps/s
-- [x] Stage B — t-short eval_history: step 0 → 0.13 food, 393k → 6.63 (CIs disjoint)
-- [x] Stage C — random and heuristic, 4 families × 100 episodes (`docs/reports/baselines.json` written by the first `evaluate`)
-- [ ] Pipeline round-trip to GitHub (checkpoint → publish → fetch in a fresh clone) — cloud cycle 1
-- [ ] Detached segment without session — cloud cycles
-- [ ] Resilience test a–f — 
-- [ ] Stage D/E eval + reward-hacking audit — 
-- [ ] World + policy parity — 
-- [ ] MVP checklist — 
+## Gates
+- [x] Stage A: pytest 18 passed (v2 world, PPO gradient check, checkpoint fallback, trainer smoke)
+- [x] Stage B: v1 t-short (0.13 → 6.63) and gen1 cloud (0.08 → 27.7)
+- [x] Stage C: v2 baselines random/forager/survivor (`evalonly/suite.py`)
+- [x] Pipeline round-trip to GitHub from the cloud: gen1 store branches
+- [ ] Detached segment without session: gen2 hourly cycles (verify a second cycle resumes from the store)
+- [ ] Resilience test a–f: run in the cloud (kill / fresh-clone fetch / corrupt checkpoint)
+- [ ] Stage D/E eval + reward-hacking audit (gen2)
+- [ ] World + policy parity: v1 PASSED (20 fixtures × 600 steps ≤ 1e-6; policy 1000 obs); v2 JS port pending
+- [ ] MVP checklist
 
 ## Cloud runs in flight
-- (none yet)
+| trigger | session | what | started |
+|---|---|---|---|
+| trig_011HXYtWo3CDkZe87X2HX58t (one-shot) | cse_01FW1hL5bHsTk4khJ57Jc2d3 | cycle-01 probe + gen1 s1,s2, 20 min | 14:33Z |
+| trig_01WshMDVj5EGSv1gd6EpsKfE (hourly :57) | cse_01FW1hL6CHnBpoa64fqBGWzQ | gen2 s1–s4, 45 min | 14:57Z |
+Disable the hourly trigger (`RemoteTrigger update enabled:false`) when all gen2 seeds report a clean terminal state.
 
 ## Open problems / questions for the user
-- Publishing the visual pack in the public repo (default: keep `design/` local-only; the web build will include only the assets it needs, after your approval) — 2026-11-18
+- Publishing the visual pack in the public repo (default: keep `design/` local; the web build ships only the assets it needs) — 2026-11-18
 
 ## Pointers
-- Decisions: `docs/DECISIONS.md` · World spec: `docs/WORLD_SPEC.md` (v1.0.0) · Reports: `docs/reports/` · Design: `design/GENESIS-VISUAL-PACK/` (local)
+- `docs/DECISIONS.md` · `docs/WORLD_SPEC.md` (v2.0.0) · `docs/reports/` · `design/GENESIS-VISUAL-PACK/` (local) · `cloud/`

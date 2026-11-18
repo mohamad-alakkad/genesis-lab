@@ -213,6 +213,10 @@ def _pid_alive(pid):
 
 def cmd_status(a):
     remote, branch = persist.config()
+    if a.remote:
+        for br in a.remote.split(","):
+            print(persist.remote_summary(br))
+        return 0
     p = RUNS / "status.json"
     lines = []
     if not p.exists():
@@ -353,6 +357,10 @@ def cmd_export(a):
 
 
 def main(argv=None):
+    try:
+        sys.stdout.reconfigure(errors="replace")
+    except Exception:
+        pass
     ap = argparse.ArgumentParser(prog="genesis")
     sub = ap.add_subparsers(dest="cmd", required=True)
     def common(s):
@@ -363,6 +371,7 @@ def main(argv=None):
     s = sub.add_parser("resume"); common(s); s.add_argument("--new", action="store_true")
     s = sub.add_parser("stop"); s.add_argument("--run")
     s = sub.add_parser("status"); s.add_argument("--json", action="store_true")
+    s.add_argument("--remote", help="comma-separated store branches, e.g. genesis-store-gen2-s1,genesis-store-gen2-s2")
     sub.add_parser("diagnose")
     s = sub.add_parser("publish"); s.add_argument("--run")
     sub.add_parser("fetch")

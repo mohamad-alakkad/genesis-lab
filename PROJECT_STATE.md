@@ -1,6 +1,7 @@
 # GENESIS — Project state
 
-**Updated:** 2026-11-18 15:00Z · **Phase:** W5 gen2 autonomous cloud training · W9 started (JS v1 port done; v2 port next)
+**Updated:** 2026-11-18 16:00Z · **Phase:** W5 gen2 cloud training (~30M/60M steps) · W9 preview live
+**Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (noindex Worker; brains = gen2-s2 dev checkpoints; rollback: `wrangler delete --name genesis-preview-3b416cc0d8`)
 **Next action:** `python -m genesis status --remote genesis-store-gen2-s1,genesis-store-gen2-s2,genesis-store-gen2-s3,genesis-store-gen2-s4` (one call, no polling)
 
 ## Commands
@@ -31,7 +32,7 @@
 - [ ] Detached segment without session: gen2 hourly cycles (verify a second cycle resumes from the store)
 - [ ] Resilience test a–f: run in the cloud (kill / fresh-clone fetch / corrupt checkpoint)
 - [ ] Stage D/E eval + reward-hacking audit (gen2)
-- [ ] World + policy parity: v1 PASSED (20 fixtures × 600 steps ≤ 1e-6; policy 1000 obs); v2 JS port pending
+- [ ] World + policy parity: v1 PASSED; v2 world PASSED (20 fixtures × 900 steps incl. visitor events); v2 policy parity test to regenerate with the final brain
 - [ ] MVP checklist
 
 ## Cloud runs in flight
@@ -42,6 +43,8 @@
 Disable the hourly trigger (`RemoteTrigger update enabled:false`) when all gen2 seeds report a clean terminal state.
 
 ## Open problems / questions for the user
+- gen2 learning flattening at ~750 survival ticks (survivor baseline 711), caught ≈ 0.7: diagnose after 60M (next-change ladder: observation/reward audit before hyperparameters)
+- Visual/audio: verified in a real Chrome (desktop); phone and listening test not yet done; 5-critic review protocol queued for after training
 - Publishing the visual pack in the public repo (default: keep `design/` local; the web build ships only the assets it needs) — 2026-11-18
 
 ## Pointers

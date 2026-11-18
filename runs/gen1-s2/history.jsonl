@@ -1,0 +1,2 @@
+{"segment": 1, "event": "start", "host_id": "vm", "pid": 404, "start": "2026-11-18T14:34:31Z", "steps_start": 0, "recovered_from": "gen1-s2/0000000000", "prev_end": null}
+{"segment": 1, "event": "end", "end": "2026-11-18T14:54:34Z", "end_reason": "segment_done", "end_confirmed": true, "steps_start": 0, "steps_end": 3309568, "lost_time_s": 0, "peak_rss_mb": 58.9, "checkpoint": "gen1-s2/0003309568"}

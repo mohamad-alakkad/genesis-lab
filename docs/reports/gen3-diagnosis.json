@@ -1,0 +1,68 @@
+{
+ "schema": "genesis.report/1",
+ "title": "gen3 failure decomposition and strategy ceilings",
+ "measured_at": "2026-11-18T19:30Z",
+ "world_spec_version": "2.1.0",
+ "family": "standard",
+ "episodes": 60,
+ "seeds": "held-out 3000000000+0..59",
+ "policy_selection": "deterministic argmax",
+ "trajectory": {
+  "gen3-s2 best (10.0M)": {
+   "captures_without_cue_in_8s": 0.0,
+   "median_warning_ticks_before_capture": 50,
+   "shelter_visible_at_warning": 0.83,
+   "threat_bouts_entered_shelter": 0.125,
+   "entered_given_shelter_within_2u": 0.21,
+   "left_while_threatened_given_inside": 0.91,
+   "predator_still_sensed_at_exit": 0.73,
+   "dash_share_inside_threatened": 0.64,
+   "dash_share_after_warning": 0.52
+  },
+  "scripted survivor": {
+   "captures_without_cue_in_8s": 0.0,
+   "median_warning_ticks_before_capture": 17,
+   "shelter_visible_at_warning": 0.58,
+   "threat_bouts_entered_shelter": 0.51,
+   "entered_given_shelter_within_2u": 0.6,
+   "left_while_threatened_given_inside": 0.17,
+   "predator_still_sensed_at_exit": 0.08,
+   "rest_share_inside_threatened": 0.89
+  }
+ },
+ "ceilings": {
+  "oracle hide-when-hunted (privileged)": {
+   "ticks": 644.9,
+   "caught": 0.7,
+   "food": 9.8
+  },
+  "oracle hide-when-predator-within-5u (privileged)": {
+   "ticks": 1068.6,
+   "caught": 0.17,
+   "food": 15.5
+  },
+  "sensory hider, memory 0": {
+   "ticks": 724.0,
+   "caught": 0.6,
+   "food": 11.2
+  },
+  "sensory hider, memory 30": {
+   "ticks": 846.4,
+   "caught": 0.4,
+   "food": 11.9
+  },
+  "sensory hider, memory 80": {
+   "ticks": 898.9,
+   "caught": 0.33,
+   "food": 11.5
+  },
+  "sensory hider, memory 150": {
+   "ticks": 933.3,
+   "caught": 0.22,
+   "food": 9.9
+  }
+ },
+ "finding": "Perception is sufficient (no capture without warning; median 5 s warning). gen3 flees in the open (52% dash) and runs through shelters (64% dash inside) instead of hiding; it leaves shelter while still sensing the predator (73%). Reactive hiding is nearly worthless here (oracle 645 ticks); preemptive avoidance works (oracle 1069). With Vela's own senses, survival rises monotonically with cue memory (724 \u2192 933 ticks).",
+ "cause_hypothesis": "The winning strategy needs memory of recent predator percepts and a horizon long enough to value staying hidden (gamma 0.99 \u2248 10 s).",
+ "change": "gen4: 2\u00d72 controlled experiment on world 2.2.0 (memory inputs on/masked \u00d7 gamma 0.99/0.997), 2 seeds per cell."
+}

@@ -1,0 +1,2 @@
+{ "name": "genesis-web", "private": true, "type": "module",
+  "scripts": { "test": "node --test test/parity.test.mjs test/policy.test.mjs" } }

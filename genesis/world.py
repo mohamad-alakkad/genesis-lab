@@ -175,6 +175,17 @@ class World:
         self.obs_pos[idx, slot[idx]] = pts[idx]; self.obs_r[idx, slot[idx]] = r[idx]; self.obs_on[idx, slot[idx]] = True
         return ok
 
+    def move_food(self, mask, i, xy):
+        """Visitor seed placement: same validity rule as the sampler. Returns accepted mask."""
+        c = self.c
+        p = np.broadcast_to(np.asarray(xy, np.float64), (self.E, 2)).copy()
+        m = 0.4
+        ok = (mask & self.food_on[:, i] & (p[:, 0] >= m) & (p[:, 1] >= m) & (p[:, 0] <= c["width"] - m)
+              & (p[:, 1] <= c["height"] - m) & self._dist_obstacles_ok(p, c["food_radius"] + 0.1)
+              & self._not_in_vents(p) & (np.linalg.norm(p - self.pos, axis=1) > 1.0))
+        self.food_pos[ok, i] = p[ok]
+        return ok
+
     def wake_vent(self, mask, v):
         m = mask & self.vent_present[:, v]
         self.vent_on[m, v] = True

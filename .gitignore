@@ -8,3 +8,4 @@ design/**/*.mp4
 node_modules/
 web/dist/
 design/
+web/test/fixtures/

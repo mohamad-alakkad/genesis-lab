@@ -1,8 +1,8 @@
 # GENESIS — Project state
 
-**Updated:** 2026-11-18 16:00Z · **Phase:** W5 gen2 cloud training (~30M/60M steps) · W9 preview live + Research Console (deployed 16:18Z, version 894fce0f)
+**Updated:** 2026-11-18 18:50Z · **Phase:** gen4 controlled 2×2 experiment in the cloud (world 2.2.0) · preview on gen2 brains
 **Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (noindex Worker; brains = gen2-s2 dev checkpoints; rollback: `wrangler delete --name genesis-preview-3b416cc0d8`)
-**Next action:** `python -m genesis status --remote genesis-store-gen2-s1,genesis-store-gen2-s2,genesis-store-gen2-s3,genesis-store-gen2-s4` (one call, no polling)
+**Next action:** `python -m genesis status --remote $(python -c "import json;print(','.join('genesis-store-'+v['run'] for v in json.load(open('cloud/conditions.json'))['tokens'].values()))")` then compare arms (survival, caught, shelter-under-threat) at matched steps; trace analysis on the best of each arm
 
 ## Commands
 - CLI: `python -m genesis <train|resume|stop|status [--remote branches]|evaluate|export|diagnose|publish|fetch>`
@@ -36,11 +36,12 @@
 - [ ] MVP checklist
 
 ## Cloud runs in flight
-| trigger | session | what | started |
-|---|---|---|---|
-| trig_011HXYtWo3CDkZe87X2HX58t (one-shot) | cse_01FW1hL5bHsTk4khJ57Jc2d3 | cycle-01 probe + gen1 s1,s2, 20 min | 14:33Z |
-| trig_01WshMDVj5EGSv1gd6EpsKfE (hourly :57) | cse_01FW1hL6CHnBpoa64fqBGWzQ | gen2 s1–s4, 45 min | 14:57Z |
-Disable the hourly trigger (`RemoteTrigger update enabled:false`) when all gen2 seeds report a clean terminal state.
+| trigger | what | schedule |
+|---|---|---|
+| trig_01WshMDVj5EGSv1gd6EpsKfE | gen4 arm A: memory ON, γ .99 s1,s2 + γ .997 s1,s2 (tokens A1–A4) | hourly :57, first 18:57Z |
+| trig_017M19mXuACfto4d9UDVraiK | gen4 arm B: memory MASKED, γ .99 s1,s2 + γ .997 s1,s2 (tokens B1–B4) | hourly :49, first run 18:49Z (session cse_01FW1hL4gqxWoP9CFhimERkb) |
+Each run: 40M steps, plateau stop disabled. Disable both triggers when all 8 runs report `budget_exhausted` (or `completed`).
+Finished: gen1 (2 seeds), gen2 (4 seeds, plateau ~750), gen3 (4 seeds, plateau ~720; diagnosis docs/reports/gen3-diagnosis.json).
 
 ## Open problems / questions for the user
 - gen2 learning flattening at ~750 survival ticks (survivor baseline 711), caught ≈ 0.7: diagnose after 60M (next-change ladder: observation/reward audit before hyperparameters)

@@ -286,7 +286,7 @@ const DUST_N = 14, dust = [];
 for (let i = 0; i < DUST_N; i++) { const d = halo(0xb9d6d2, 0.5, 0); d.visible = false; d.userData = { life: 0 }; dust.push(d); }
 
 async function loadBrains() {
-  const names = ["final", "best", "middle", "early", "step0"];
+  const names = ["best", "final", "middle", "early", "step0"];  // default = best on fresh held-out seeds
   for (const n of names) {
     try {
       const r = await fetch(`public/policies/policy-${n}.json`); if (!r.ok) continue;

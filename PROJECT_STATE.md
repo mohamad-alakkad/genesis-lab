@@ -1,8 +1,8 @@
 # GENESIS — Project state
 
-**Updated:** 2026-11-18 18:50Z · **Phase:** gen4 controlled 2×2 experiment in the cloud (world 2.2.0) · preview on gen2 brains
-**Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (noindex Worker; brains = gen2-s2 dev checkpoints; rollback: `wrangler delete --name genesis-preview-3b416cc0d8`)
-**Next action:** `python -m genesis status --remote $(python -c "import json;print(','.join('genesis-store-'+v['run'] for v in json.load(open('cloud/conditions.json'))['tokens'].values()))")` then compare arms (survival, caught, shelter-under-threat) at matched steps; trace analysis on the best of each arm
+**Updated:** 2026-11-18 21:55Z · **Phase:** gen4 done (horizon is the key; evasion learned, not hiding) · site on gen4 brain, world 2.2.0
+**Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (gen4-mem-g997-s1 best 28.0M default; world 2.2.0; Worker version 857ddc78)
+**Next action:** decide gen5 direction from the open problem (hiding not learned; oracle shows early hiding → 17% capture): candidates in docs/DECISIONS.md
 
 ## Commands
 - CLI: `python -m genesis <train|resume|stop|status [--remote branches]|evaluate|export|diagnose|publish|fetch>`
@@ -36,12 +36,8 @@
 - [ ] MVP checklist
 
 ## Cloud runs in flight
-| trigger | what | schedule |
-|---|---|---|
-| trig_01WshMDVj5EGSv1gd6EpsKfE | gen4 arm A: memory ON, γ .99 s1,s2 + γ .997 s1,s2 (tokens A1–A4) | hourly :57, first 18:57Z |
-| trig_017M19mXuACfto4d9UDVraiK | gen4 arm B: memory MASKED, γ .99 s1,s2 + γ .997 s1,s2 (tokens B1–B4) | hourly :49, first run 18:49Z (session cse_01FW1hL4gqxWoP9CFhimERkb) |
-Each run: 40M steps, plateau stop disabled. Disable both triggers when all 8 runs report `budget_exhausted` (or `completed`).
-Finished: gen1 (2 seeds), gen2 (4 seeds, plateau ~750), gen3 (4 seeds, plateau ~720; diagnosis docs/reports/gen3-diagnosis.json).
+- None. Both gen4 triggers disabled 21:18Z (trig_01WshMDVj5EGSv1gd6EpsKfE, trig_017M19mXuACfto4d9UDVraiK).
+- Results: docs/reports/gen4-results.json/.md (fresh seeds 3e9+50000.., 200 episodes per checkpoint). Best arms ≈1060–1074 ticks, caught ≈36% (gen3 689/78%, survivor 724/60%, oracle 1069/17%).
 
 ## Open problems / questions for the user
 - gen2 learning flattening at ~750 survival ticks (survivor baseline 711), caught ≈ 0.7: diagnose after 60M (next-change ladder: observation/reward audit before hyperparameters)

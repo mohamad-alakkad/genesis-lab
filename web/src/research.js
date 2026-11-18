@@ -54,20 +54,31 @@ export function initResearch(api) {
 
   // ---------------------------------------------------------------- overview
   function overview() {
-    const b = api.brainMeta(); const g2 = research?.lineages?.gen2 || [], g3 = research?.lineages?.gen3 || [];
-    const rep = research?.reports?.["gen2-diagnosis"];
-    const params = api.paramCount();
-    const best2 = g2.length ? Math.max(...g2.flatMap((r) => r.eval.map((e) => e.score ?? 0))) : null;
+    const b = api.brainMeta(), params = api.paramCount();
+    const g4 = research?.reports?.["gen4-results"], g3 = research?.reports?.["gen3-diagnosis"], g2 = research?.reports?.["gen2-diagnosis"];
+    const arms = g4?.arms || {}, armBest = (k) => arms[k]?.best;
+    const top = Object.values(arms).map((a) => a.best?.ticks?.mean || 0);
+    const it = g4?.interpretation || {};
+    const ARM_LABEL = { "gen4-mem-g997": "memory · γ 0.997", "gen4-nomem-g997": "no memory · γ 0.997", "gen4-mem-g99": "memory · γ 0.99", "gen4-nomem-g99": "no memory · γ 0.99" };
     return el("div", { class: "rc-sec" },
       el("p", { class: "rc-lede", html: `Vela is a <b>PPO</b> agent: two tanh MLPs (policy and value, ${b ? b.hidden.join("×") : "?"} hidden units, ${params.toLocaleString()} parameters) trained <b>from random weights</b> in a NumPy simulation, then run here unchanged: the browser executes the exported weights once per 0.1 s world tick and takes the argmax action.` }),
       el("div", { class: "rc-tiles" },
         tile("brain on stage", b ? `${b.milestone}` : "none", b ? `${b.source} · ${b.step.toLocaleString()} steps · world ${b.spec}` : "", "LIVE"),
-        tile("gen2 best held-out survival", best2 ? `${fmt(best2, 0)} ticks` : "—", "of 1500 max · 100 episodes · argmax", "LOG"),
-        tile("training lineages", Object.keys(research?.lineages || {}).join(" · ") || "loading…", "gen2 = world 2.0.0 · gen3 = world 2.1.0 (not comparable)", "LOG")),
-      el("h3", {}, "What it learned, and what it did not"),
-      rep ? el("div", { class: "rc-callout", html: `${tag("LOG")} <b>Finding (${rep.episodes} held-out episodes, world ${rep.world_spec_version}):</b> ${rep.finding}<br><b>Hypothesis:</b> ${rep.cause_hypothesis}<br><b>Change:</b> ${rep.change}` }) : el("p", {}, "loading…"),
-      rep ? table(["", "survival (ticks)", "caught", "seeds", "sheltered when threatened"], Object.entries(rep.rows).filter(([k]) => !k.includes("no predator")).map(([k, r]) => [k, fmt(r.ticks, 0), pct(r.caught), fmt(r.food, 1), r.shelter_when_threat == null ? "—" : pct(r.shelter_when_threat, 1)])) : "",
-      el("p", { class: "rc-note", html: `Status of gen3 (world 2.1.0): ${g3.length ? `${g3.length} seeds published, latest step ${Math.max(...g3.map((r) => r.global_step)).toLocaleString()}` : "training queued in Claude Code Cloud; no gen3 results yet"}. Training is not finished; nothing here should be read as a final result.` }));
+        tile("best arm, fresh held-out seeds", top.length ? `${fmt(Math.max(...top), 0)} ticks` : "—", "of 1500 · 400 episodes per arm · argmax", "LOG"),
+        tile("references", "724 · 1069", "scripted survivor · privileged oracle (ticks)", "LOG")),
+      el("h3", {}, "Latest experiment: what made the difference"),
+      g4 ? el("div", { class: "rc-callout", html: `${tag("LOG")} <b>Controlled 2×2 (world 2.2.0, 2 seeds per arm, 40M steps each):</b><br>
+        <b>Horizon:</b> ${it.horizon}<br><b>Memory:</b> ${it.memory}<br><b>What it actually learned:</b> ${it.strategy_learned}` }) : el("p", {}, "loading…"),
+      g4 ? table(["arm (best checkpoints)", "survival ticks (95% CI)", "caught", "seeds eaten", "sheltered when threatened"],
+        Object.keys(ARM_LABEL).filter((k) => armBest(k)).map((k) => { const a = armBest(k); return [ARM_LABEL[k], `${fmt(a.ticks.mean, 0)} [${fmt(a.ticks.ci95[0], 0)}, ${fmt(a.ticks.ci95[1], 0)}]`, pct(a.caught), fmt(a.food, 1), pct(a.shelter_when_threat, 1)]; })) : "",
+      el("p", { class: "rc-note", html: g4 ? `${g4.evaluation}. "Best" checkpoints were selected on a different seed block, so these numbers are free of that selection bias.` : "" }),
+      el("h3", {}, "How we got here"),
+      el("ul", { class: "rc-list", html: [
+        g2 && `<li><b>gen2 (world 2.0.0):</b> ${g2.finding}</li>`,
+        g3 && `<li><b>gen3 (world 2.1.0):</b> ${g3.finding}</li>`,
+        g4 && `<li><b>gen4 (world 2.2.0):</b> the longer horizon roughly halved captures; memory mattered only with the short horizon. Hiding still did not emerge; evasion did.</li>`,
+      ].filter(Boolean).join("") }),
+      el("p", { class: "rc-note" }, "Open problem: the network survives by evading, not by staying hidden (3.5% of threatened time sheltered). The privileged oracle shows hiding early could cut captures to 17%."));
   }
   const pct = (x, d = 0) => x == null ? "—" : `${(100 * x).toFixed(d)}%`;
   function tile(k, v, sub, src) { return el("div", { class: "rc-tile", html: `<div class="k">${k} ${tag(src)}</div><div class="v">${v}</div><div class="s">${sub}</div>` }); }

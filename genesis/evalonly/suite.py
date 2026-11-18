@@ -10,13 +10,14 @@ FAMILIES = ["standard", "unseen_layout", "night", "relentless", "one_shelter", "
 FAMILY_OFFSET = {f: i * 100_000 for i, f in enumerate(FAMILIES)}
 
 
-def eval_seeds(family, n):
-    return C["eval_seed_base"] + FAMILY_OFFSET[family] + np.arange(n, dtype=np.int64)
+def eval_seeds(family, n, start=0):
+    return C["eval_seed_base"] + FAMILY_OFFSET[family] + start + np.arange(n, dtype=np.int64)
 
 
-def run_episodes(act_fn, family, n, max_ticks=None):
+def run_episodes(act_fn, family, n, max_ticks=None, start=0):
+    """start > 0 selects a disjoint block of held-out seeds (e.g. for unbiased final verdicts after best-checkpoint selection)."""
     w = World(n, family)
-    w.reset(np.ones(n, bool), eval_seeds(family, n))
+    w.reset(np.ones(n, bool), eval_seeds(family, n, start))
     done = np.zeros(n, bool)
     keys = ("ticks", "food", "survived", "caught", "hazard", "dist", "shelter_when_threat", "shelter_at_night",
             "shelter_frac", "rest_frac", "dash_when_threat", "threat_frac")

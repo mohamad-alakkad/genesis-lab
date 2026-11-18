@@ -42,6 +42,7 @@ def ci(v):
 def main(argv):
     cpath = Path(argv[0]) if argv else ROOT / "cloud" / "conditions.json"
     n = int(argv[1]) if len(argv) > 1 else 100
+    start = int(argv[2]) if len(argv) > 2 else 50000  # fresh held-out block, disjoint from the seeds used to pick "best"
     conds = json.loads(cpath.read_text())
     tmp = Path(tempfile.mkdtemp(prefix="genesis-exp-"))
     runs, arms = {}, {}
@@ -60,7 +61,7 @@ def main(argv):
                 d = rd / "ckpt" / cid.split("/")[-1] if cid else None
                 if d is None or not d.exists():
                     continue
-                res = run_episodes(load_policy(d), "standard", n)
+                res = run_episodes(load_policy(d), "standard", n, start=start)
                 info[label] = {"checkpoint": cid, **{k: ci(res[k]) for k in KEYS}, "raw_ticks": [float(x) for x in res["ticks"]]}
             runs[c["run"]] = info
             arm = c["run"].rsplit("-s", 1)[0]
@@ -104,7 +105,7 @@ def main(argv):
             sep = a["ticks"]["ci95"][0] > b["ticks"]["ci95"][1]
             verdict.append(f"{m}: gamma .997 {a['ticks']['mean']} vs .99 {b['ticks']['mean']} ticks → " + ("longer horizon better (CIs separated)" if sep else "no CI-separated horizon effect"))
     out = {"schema": "genesis.experiment/1", "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "experiment": conds.get("experiment"),
-           "evaluation": f"held-out family 'standard', {n} episodes per checkpoint, seeds 3e9+0..{n - 1} (same for all), deterministic argmax, run's own input mask",
+           "evaluation": f"held-out family 'standard', {n} episodes per checkpoint, fresh seeds 3e9+{start}..{start + n - 1} (disjoint from the seeds used to select 'best'; same for all arms), deterministic argmax, run's own input mask",
            "reference": {"scripted survivor": 724.0, "sensory hider memory 0": 724.0, "sensory hider memory 150": 933.3, "gen3 best": 688.7},
            "arms": summary, "matched_steps": at, "verdict": verdict,
            "runs": {k: {kk: vv for kk, vv in v.items() if kk != "raw_ticks"} for k, v in runs.items()}}

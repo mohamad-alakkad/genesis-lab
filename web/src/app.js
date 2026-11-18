@@ -243,6 +243,45 @@ function springStep(sp, target, k, c, dt) {  // semi-implicit Euler in ≤4 ms s
   if (!Number.isFinite(sp.x) || !Number.isFinite(sp.v)) { sp.x = target; sp.v = 0; }
   return sp.x;
 }
+// ---- anatomy: a vertex-deformation layer on Vela's mesh (head, dorsal breath, travelling wave, tail, tension) + additive joint motion
+const velaU = { uHeadYaw: { value: 0 }, uHeadPitch: { value: 0 }, uTailYaw: { value: 0 }, uWaveAmp: { value: 0 }, uWavePhase: { value: 0 },
+  uBreath: { value: 0 }, uTension: { value: 0 }, uCompress: { value: 0 }, uZmin: { value: -0.5 }, uZmax: { value: 0.5 } };
+const anat = { head: spring(), headP: spring(), tail: spring(), tension: spring(), compress: spring(), sailOpen: spring(), sailSweep: spring(), sailTurn: spring(),
+  ribX: spring(), ribY: spring(), tipX: spring(), tipY: spring(), breathPh: 0, exertion: 0, blinkT: 2, blink: 0, bones: null, seam: null, seamBase: 1 };
+const VELA_GLSL = `
+  float vu = clamp((transformed.z - uZmin) / (uZmax - uZmin), 0., 1.);   // 0 = nose (−Z), 1 = rear
+  float zc = mix(uZmin, uZmax, 0.5);
+  transformed.z = zc + (transformed.z - zc) * (1. - uCompress);          // fore–aft compression under acceleration
+  float prof = exp(-pow((vu - 0.42) / 0.22, 2.));
+  transformed.y += uBreath * prof * max(objectNormal.y, 0.) * 0.035;     // breath swells the dorsal surface only
+  transformed.x *= 1. + uBreath * prof * 0.03;
+  transformed.y *= 1. - 0.10 * uTension; transformed.x *= 1. - 0.04 * uTension;   // tension draws the body in
+  float wph = uWavePhase - vu * 5.5;
+  transformed.x += sin(wph) * uWaveAmp * pow(vu, 1.4) * 0.08;            // travelling wave, nose → tail
+  transformed.y += cos(wph) * uWaveAmp * pow(vu, 1.6) * 0.03;
+  float wh = smoothstep(0.42, 0.0, vu); vec3 ph = vec3(0., 0., mix(uZmin, uZmax, 0.42)); vec3 hr = transformed - ph;
+  float ha = uHeadYaw * wh, hb = uHeadPitch * wh;
+  hr = vec3(hr.x * cos(ha) + hr.z * sin(ha), hr.y, -hr.x * sin(ha) + hr.z * cos(ha));
+  hr = vec3(hr.x, hr.y * cos(hb) - hr.z * sin(hb), hr.y * sin(hb) + hr.z * cos(hb));
+  transformed = ph + hr;                                                  // the head turns and pitches on its own
+  float wt = smoothstep(0.58, 1.0, vu); vec3 pt = vec3(0., 0., mix(uZmin, uZmax, 0.58)); vec3 tq = transformed - pt; float ta = uTailYaw * wt;
+  transformed = pt + vec3(tq.x * cos(ta) + tq.z * sin(ta), tq.y, -tq.x * sin(ta) + tq.z * cos(ta));   // tail follows through
+`;
+function installAnatomy(root) {
+  let zmin = Infinity, zmax = -Infinity;
+  root.traverse((o) => { if (!o.isMesh) return; o.geometry.computeBoundingBox(); zmin = Math.min(zmin, o.geometry.boundingBox.min.z); zmax = Math.max(zmax, o.geometry.boundingBox.max.z);
+    if (o.name.includes("seam")) { anat.seam = o.material; anat.seamBase = o.material.emissiveIntensity || 1; }
+    const m = o.material;
+    m.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, velaU);
+      sh.vertexShader = "uniform float uHeadYaw, uHeadPitch, uTailYaw, uWaveAmp, uWavePhase, uBreath, uTension, uCompress, uZmin, uZmax;\n" +
+        sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n" + VELA_GLSL); };
+    m.customProgramCacheKey = () => "vela-anatomy-1"; m.needsUpdate = true; });
+  velaU.uZmin.value = zmin; velaU.uZmax.value = zmax;
+  const g = (n) => root.getObjectByName(n);
+  anat.bones = { sL: g("sail_L"), sR: g("sail_R"), rL: g("ribbon_L"), rR: g("ribbon_R"), tL: g("ribbon_tip_L"), tR: g("ribbon_tip_R") };
+}
+const _q = new THREE.Quaternion(), _e = new THREE.Euler();
+function addRot(bone, x, y, z) { if (!bone) return; _q.setFromEuler(_e.set(x, y, z, "XYZ")); bone.quaternion.multiply(_q); }
 const DUST_N = 14, dust = [];
 for (let i = 0; i < DUST_N; i++) { const d = halo(0xb9d6d2, 0.5, 0); d.visible = false; d.userData = { life: 0 }; dust.push(d); }
 
@@ -486,7 +525,7 @@ function render(dt, t, a) {
     const motion = s.resting || world.v < 0.02 ? "idle" : behave.closing >= 3 ? "nearingSeed" : "moving";
     // root transform lives on velaRoot; the controller only drives clips (local pose stays at the origin)
     vela.accept({ episode, sequence: s.t, x: 0, y: 0, z: 0, yaw: 0, motion, lowEnergy: s.energy < 0.2, events: velaEvents.splice(0) });
-    vela.update(dt);
+    vela.update(dt);  // clip pose first; the additive anatomy layer is applied further down in this frame
   }
   velaRoot.rotation.y = yaw;
   const threat = behave.threatT > 0.2;
@@ -521,10 +560,38 @@ function render(dt, t, a) {
       else { let best = -1, bv = 0; for (let r = 0; r < C.n_rays; r++) { const f = o[N_CH * r + 1]; if (f > bv) { bv = f; best = r; } } if (best >= 0) lookT = clamp(RAY_REL[best] * 0.35, -0.35, 0.35); }
     }
     if (!o || (lookT === 0 && s.v < 0.02 && !threat)) { body.glanceT -= dt; if (body.glanceT <= 0) { body.glance = (Math.random() - 0.5) * 0.5; body.glanceT = 1.5 + Math.random() * 3; } lookT = body.glance; }
-    const twist = springStep(body.twist, reduceMotion ? 0 : lookT, tense ? 160 : 60, tense ? 18 : 10, dt);
     const lift = springStep(body.lift, amp * 0.9 * Math.max(0, stride) + (s.inWater ? -0.05 : 0), 160, 16, dt);
-    velaChild.scale.set(1 + breath * 0.5 + (1 - sq) * 0.45, sq + breath, 1 + breath * 0.5 + (1 - sq) * 0.3);
-    velaChild.rotation.set(pitch, twist, roll, "YXZ");
+    // root carries only weight (lean, bank, lift, a little overall squash); the anatomy layer carries the rest
+    velaChild.scale.set(1 + (1 - sq) * 0.25, 1 - (1 - sq) * 0.5, 1 + (1 - sq) * 0.15);
+    velaChild.rotation.set(pitch, 0, roll, "YXZ");
+    // --- anatomy drivers (all from simulation state, observations and the chosen action)
+    const rm = reduceMotion ? 0 : 1, wn = clamp(s.w / C.w_max, -1, 1);
+    anat.exertion = clamp(anat.exertion + (s.dashing ? dt * 0.35 : -dt * 0.12), 0, 1);       // breath stays quick after a sprint, then settles
+    const bRate = s.resting && !threat ? 0.22 : tense ? 0.95 : exhausted ? 0.75 : 0.34 + 0.5 * anat.exertion;
+    const bDepth = (s.resting && !threat ? 1.0 : tense ? 0.35 : exhausted ? 1.3 : 0.6 + 0.6 * anat.exertion) * rm;
+    anat.breathPh += dt * bRate * Math.PI * 2;
+    velaU.uBreath.value = bDepth * (0.5 + 0.5 * Math.sin(anat.breathPh));
+    // head: leads into turns, orients toward what is sensed (visual yaw runs opposite to the sim heading angle), dips toward a near seed
+    const headT = (-lookT - wn * 0.18) * rm, headPT = ((behave.closing >= 3 ? 0.12 : 0) + (tense ? -0.08 : 0) + (exhausted ? 0.1 : 0)) * rm;
+    velaU.uHeadYaw.value = springStep(anat.head, clamp(headT, -0.55, 0.55), tense ? 260 : 110, tense ? 26 : 14, dt);
+    velaU.uHeadPitch.value = springStep(anat.headP, headPT, 90, 12, dt);
+    velaU.uTailYaw.value = springStep(anat.tail, wn * 0.22 * rm, 45, 5, dt);              // lags behind the turn and overshoots after
+    velaU.uTension.value = springStep(anat.tension, tense ? 1 : s.inShelter && threat ? 0.7 : 0, tense ? 80 : 12, tense ? 14 : 6, dt);  // fast to tense, slow to release
+    velaU.uCompress.value = springStep(anat.compress, clamp(Math.abs(body.accel) * 0.25, 0, 0.08) * rm, 140, 14, dt);
+    velaU.uWaveAmp.value = amp * 9 * rm; velaU.uWavePhase.value = body.phase * Math.PI * 2;
+    // sails (hinge about local Z, sweep about Y) and ribbons (secondary chain), additive on top of the clip pose
+    const open = springStep(anat.sailOpen, (tense ? -0.22 : 0) + (exhausted ? -0.14 : 0) + (s.resting ? 0.06 : 0) + 0.12 * stride * vn, k * 0.9, c, dt);
+    const sweep = springStep(anat.sailSweep, clamp(body.accel * 0.5, -0.1, 0.3) + (s.dashing ? 0.15 : 0), 120, 12, dt);
+    const turn = springStep(anat.sailTurn, wn * 0.18, 90, 10, dt);
+    const ribY = springStep(anat.ribY, wn * 0.35 - 0.6 * velaU.uTailYaw.value, 35, 4, dt), tipY = springStep(anat.tipY, ribY * 1.4, 22, 2.6, dt);
+    const ribX = springStep(anat.ribX, -lift * 4 + 0.15 * vn - (exhausted ? 0.12 : 0), 40, 5, dt), tipX = springStep(anat.tipX, ribX * 1.3, 25, 3, dt);
+    if (anat.bones && rm) { const B = anat.bones;
+      addRot(B.sL, 0, sweep, open + turn); addRot(B.sR, 0, -sweep, -(open - turn));
+      addRot(B.rL, ribX, ribY, 0); addRot(B.rR, ribX, ribY, 0); addRot(B.tL, tipX, tipY, 0); addRot(B.tR, tipX, tipY, 0); }
+    // sensory seam: slow blinks (more often when alert), dimmer when resting
+    anat.blinkT -= dt; if (anat.blinkT <= 0) { anat.blink = 0.18; anat.blinkT = (tense ? 1.2 : 3) + Math.random() * (tense ? 1.5 : 4); }
+    anat.blink = Math.max(0, anat.blink - dt);
+    if (anat.seam) anat.seam.emissiveIntensity = anat.seamBase * (anat.blink > 0 ? 0.25 : 1) * (s.resting && !threat ? 0.55 : 1);
     const near = world.pred.on && world.pred.pounce && !s.inShelter;
     const tremble = !reduceMotion && ((s.inShelter && threat) || near || fl > 0) ? (fl > 0 ? 0.02 : 0.006) : 0;
     velaChild.position.set((Math.random() - 0.5) * tremble, 0.03 + lift, (Math.random() - 0.5) * tremble);
@@ -672,6 +739,7 @@ async function boot() {
         o.material = std;
       }
     });
+    installAnatomy(vela.object);
     velaChild.add(vela.object);
     newEpisode();
     $("loadNote").textContent = Object.keys(policies).length ? "ready" : "ready (no trained policy found; Vela will stay still)";

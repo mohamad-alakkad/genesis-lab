@@ -4,7 +4,9 @@
 //   RUN   - experiments executed here, in this browser, on stated seeds (reproducible)
 //   DERIVED - computed from the above (formula stated)
 // Nothing here changes the policy's weights. Sensory interventions are labelled out-of-distribution.
-import { World, CONSTANTS as C, N_CH } from "./sim/world.js";
+import * as SIM from "./sim/world.js";
+const { World, CONSTANTS: C, N_CH } = SIM;
+const N_MEM = SIM.N_MEM || 0;  // memory inputs exist from world 2.2.0
 
 const SEED_COLORS = ["#1FA89C", "#8A6CF0", "#C77A40", "#4A86D8"];  // validated: dark surface, CVD ΔE ≥ 11
 const ACTIONS = C.actions.map((a) => a.replace("_", " "));
@@ -12,6 +14,8 @@ const CH = ["solid", "seed", "vent", "shelter", "predator", "water"];
 const CH_COLOR = ["#8fa3ad", "#FFB36B", "#F2978A", "#46E7D7", "#ff5f6d", "#6f9cff"];
 const SELF = ["energy", "stamina", "speed v/vmax", "turn ω/ωmax", "in shelter", "in vent", "in water", "contact", "light", "raining",
   "sin(day phase)", "cos(day phase)", "heard: proximity", "heard: sin bearing", "heard: cos bearing"];
+const MEM = ["memory: recency of last predator percept", "memory: sin bearing to where it was", "memory: cos bearing to where it was",
+  "memory: remembered proximity", "memory: it was pouncing"].slice(0, N_MEM);
 const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === "class") e.className = v; else if (k === "html") e.innerHTML = v; else e.setAttribute(k, v); } for (const c of kids) e.append(c); return e; };
 const fmt = (x, d = 2) => (x === null || x === undefined || Number.isNaN(x)) ? "—" : Number(x).toFixed(d);
 const tag = (kind) => `<span class="src src-${kind.toLowerCase()}" title="${{ LIVE: "live from the running simulation", LOG: "recorded training/evaluation", RUN: "run in this browser on stated seeds", DERIVED: "computed from live or recorded values" }[kind]}">${kind}</span>`;
@@ -87,7 +91,7 @@ export function initResearch(api) {
         el("div", {}, el("h3", { html: `Senses ${tag("LIVE")}` }), svg, el("div", { class: "rc-legend" }, ...CH.map((c, i) => el("span", { html: `<i style="background:${CH_COLOR[i]}"></i>${c}` }))),
           el("p", { class: "rc-note" }, "11 rays over ±120°. Each wedge segment = proximity (1 − d/6 u) of the nearest object of that kind; nothing behind Vela is seen, the predator only within light-dependent sight (2.5–6 u). Hearing covers all directions.")),
         el("div", {}, el("h3", { html: `Policy output ${tag("LIVE")}` }), probs, scal)),
-      el("h3", { html: `Observation vector (89 inputs, raw, before normalization) ${tag("LIVE")}` }), selfT,
+      el("h3", { html: `Observation vector (${SIM.OBS_DIM} inputs, raw, before normalization) ${tag("LIVE")}` }), selfT,
       el("div", { class: "rc-grid2" },
         el("div", {}, el("h3", { html: `Reward this episode ${tag("LIVE")}` }), spark, el("p", { class: "rc-note" }, "Cumulative training reward: +1 seed, −0.05/tick in an active vent, −1 starvation, −2 caught. Nothing rewards hiding or resting.")),
         el("div", {}, el("h3", { html: `Behavioral events ${tag("LIVE")}` }), ev)),
@@ -129,7 +133,8 @@ export function initResearch(api) {
     for (let k = 0; k < C.n_rays; k++) rows.push(`<tr><td>ray ${k} (${fmt(api.rayRel()[k] * 180 / Math.PI, 0)}°)</td>${CH.map((c, ch) => `<td class="${o[N_CH * k + ch] > 0 ? "hot" : ""}">${fmt(o[N_CH * k + ch], 2)}</td>`).join("")}</tr>`);
     liveEls.selfT.innerHTML = `<table class="rc-table obs"><tr><th>input</th>${CH.map((c) => `<th>${c}</th>`).join("")}</tr>${rows.join("")}</table>
       <table class="rc-table obs"><tr><th>#</th><th>self / environment input</th><th>value</th></tr>${SELF.map((n, i) => `<tr><td>${S + i}</td><td>${n}</td><td>${fmt(o[S + i], 3)}</td></tr>`).join("")}
-      <tr><td>${S + 15}–${S + 22}</td><td>last action (one-hot)</td><td>${ACTIONS[o.slice(S + 15).indexOf(1)] ?? "—"}</td></tr></table>`;
+      ${MEM.map((n, i) => `<tr><td>${S + 15 + i}</td><td>${n}</td><td>${fmt(o[S + 15 + i], 3)}</td></tr>`).join("")}
+      <tr><td>${S + 15 + N_MEM}–${S + 22 + N_MEM}</td><td>last action (one-hot)</td><td>${ACTIONS[Array.from(o.slice(S + 15 + N_MEM)).indexOf(1)] ?? "—"}</td></tr></table>`;
     // reward sparkline
     const rw = s.rewardTrace; const n = rw.length;
     if (n > 1) { const mn = Math.min(0, ...rw), mx = Math.max(1, ...rw); const pts = rw.map((v, i) => `${(i / (n - 1)) * 300},${58 - ((v - mn) / (mx - mn)) * 54}`).join(" ");
@@ -143,9 +148,9 @@ export function initResearch(api) {
     const wrap = el("div", { class: "rc-sec" });
     if (!research) { wrap.append(el("p", {}, "loading training records…")); return wrap; }
     const lin = research.lineages;
-    for (const name of ["gen2", "gen3", "gen1"]) {
+    for (const name of ["gen4", "gen3", "gen2", "gen1"]) {
       const runs = lin[name]; if (!runs?.length) { if (name === "gen3") wrap.append(el("p", { class: "rc-note", html: `${tag("LOG")} gen3 (world 2.1.0): no published evaluations yet.` })); continue; }
-      const v = research.world_versions[name];
+      const v = research.world_versions[name] || runs[0].world_spec_version;
       const key = runs[0].eval.some((e) => e.score != null) ? "score" : "food_mean";
       wrap.append(el("h3", { html: `${name} · world ${v} · ${runs.length} independent seeds ${tag("LOG")}` }));
       const ref = name === "gen2" ? { y: research.reports["gen2-diagnosis"]?.rows?.["scripted survivor (evaluation-only baseline)"]?.ticks, label: "scripted survivor (60 ep.)" } : null;

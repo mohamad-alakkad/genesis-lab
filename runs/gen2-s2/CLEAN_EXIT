@@ -1,0 +1,8 @@
+{
+ "end_reason": "plateau",
+ "state": "plateaued",
+ "step": 34013184,
+ "at": "2026-11-18T15:59:51Z",
+ "at_ts": 1795017591.976656,
+ "checkpoint": "gen2-s2/0034013184"
+}

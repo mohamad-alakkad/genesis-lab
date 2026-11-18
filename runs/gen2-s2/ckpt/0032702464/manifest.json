@@ -1,0 +1,33 @@
+{
+ "schema": "genesis.manifest/1",
+ "run_id": "gen2-s2",
+ "checkpoint_id": "gen2-s2/0032702464",
+ "parent": null,
+ "global_step": 32702464,
+ "wall_clock_trained_s": 2597.3,
+ "created_at": "2026-11-18T15:57:57Z",
+ "files": [
+  {
+   "path": "model.npz",
+   "sha256": "6e9258b686476313ad992bf623ffbe8547cf55557f1739c35557c05f03b41c1a",
+   "size": 1384164
+  },
+  {
+   "path": "state.json",
+   "sha256": "41f8b39f66f5f888482d6d2a2b19528367105c7d984f4203fc61c1165d71c70a",
+   "size": 2588
+  }
+ ],
+ "config_hash": "sha256:e26d9c15754436f686660fb53e35a5b470a7cacf2e95c39ef5e777510a118c63",
+ "world_spec_version": "2.0.0",
+ "code_commit": "019a40e",
+ "code_dirty": false,
+ "dependencies": {
+  "python": "3.11.18",
+  "numpy": "2.4.6"
+ },
+ "verified": true,
+ "last_known_good": "gen2-s2/0032669696",
+ "milestones": [],
+ "eval_summary": null
+}

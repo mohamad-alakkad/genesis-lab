@@ -18,11 +18,15 @@ def bundle(d, milestone):
     L = sum(1 for k in p if k.startswith("pi.W"))
     layers = [{"w": p[f"pi.W{k}"].tolist(), "b": p[f"pi.b{k}"].tolist(), "activation": "tanh" if k < L - 1 else "linear"}
               for k in range(L)]
-    b = {"schema": "genesis.policy/1", "world_spec_version": SPEC_VERSION, "milestone": milestone,
+    b = {"schema": "genesis.policy/1", "world_spec_version": man["world_spec_version"], "milestone": milestone,
          "source_checkpoint_id": man["checkpoint_id"], "training_step": man["global_step"],
          "observation": {"size": OBS_DIM, "layout": "see WORLD_SPEC §Observations"}, "actions": C["actions"],
          "normalization": {"mean": mu.tolist(), "var": var.tolist(), "clip": 10.0, "epsilon": 1e-8},
          "network": {"layers": layers, "output": "logits"}, "selection": "argmax",
+         "value_network": {"layers": [{"w": p[f"v.W{k}"].tolist(), "b": p[f"v.b{k}"].tolist(),
+                                       "activation": "tanh" if k < L - 1 else "linear"} for k in range(L)],
+                           "output": "state value V(s) (critic, training-time estimate of discounted return)"},
+         "hyperparameters_hidden": [len(p[f"pi.b{k}"]) for k in range(L - 1)],
          "eval_summary": man.get("eval_summary")}
     b["checksum"] = hashlib.sha256(json.dumps(b, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return b

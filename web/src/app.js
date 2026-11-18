@@ -6,6 +6,7 @@ import { World, CONSTANTS as C, SPEC_VERSION, RAY_REL, N_CH } from "./sim/world.
 import { loadPolicy } from "./sim/policy.js";
 import { createVelaController } from "./vela-controller.mjs";
 import { Soundscape } from "./audio.js";
+import { initResearch } from "./research.js";
 
 const W = C.width, H = C.height, TICK = 0.1;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -247,9 +248,11 @@ function setBrain(k) {
   $("honesty").textContent = m ? `Every movement is chosen by this network (${m.source}), one decision per tick. Labels below are derived from the simulation, not feelings.` : "No trained policy available.";
 }
 
-function newEpisode() {
+const rlog = { events: [], rewardTrace: [], ret: 0, value: null };
+function newEpisode(seed = null) {
   world = new World("standard");
-  world.reset(4000000000 + Math.floor(Math.random() * 100000000));
+  world.reset(seed ?? 4000000000 + Math.floor(Math.random() * 100000000));
+  rlog.events = [{ tick: 0, text: `episode start · seed ${world.seed}` }]; rlog.rewardTrace = [0]; rlog.ret = 0;
   episode++;
   buildProps(world);
   prev = cur = snap();
@@ -263,7 +266,9 @@ function snap() { const s = world.snapshot(); s.seedOn = world.food.map((f) => f
 function decide() {
   const obs = world.observe();
   if (!brain) return { a: 7, obs, probs: null };
-  const { action, logits } = brain.act(obs);
+  const seen = researchApi.setSensory ? researchApi.setSensory(obs) : obs;  // experimental interventions only
+  const { action, logits } = brain.act(seen);
+  rlog.value = brain.value ? brain.value(seen) : null;
   const mx = Math.max(...logits); const ex = Array.from(logits, (z) => Math.exp(z - mx)); const sum = ex.reduce((a, b) => a + b, 0);
   return { a: action, obs, probs: ex.map((e) => e / sum) };
 }
@@ -273,6 +278,8 @@ function tick() {
   const { a, obs, probs } = decide();
   lastProbs = probs; lastAction = a;
   const r = world.step(a);
+  rlog.ret += r.reward; rlog.rewardTrace.push(rlog.ret); if (rlog.rewardTrace.length > 1600) rlog.rewardTrace.shift();
+  if (r.dashing && !(prev && prev.dashing)) rlog.events.push({ tick: world.t, text: "dash started" });
   prev = cur; cur = snap(); cur.obs = obs; cur.action = a; cur.dashing = r.dashing; cur.probs = probs;
   handleEvents(world.events.splice(0));
   interpretBehavior(obs, probs);
@@ -290,8 +297,11 @@ function endEpisode() {
 // ------------------------------------------------------------------ events → visuals + sound
 let lastRipple = -10;
 function panOf(x) { return clamp((toX(x) - camTarget.x) / 6, -1, 1); }
+const EV_TEXT = { eat: "seed eaten", grow: "seed regrew", enter_shelter: "entered shelter", leave_shelter: "left shelter", rain_start: "rain began", rain_end: "rain stopped", caught: "CAUGHT by the predator", starved: "starved" };
 function handleEvents(evs) {
   for (const e of evs) {
+    if (e.kind !== "grow") rlog.events.push({ tick: e.tick, text: e.kind === "predator_mode" ? `predator: ${e.from} → ${e.to}` : EV_TEXT[e.kind] || e.kind });
+    if (rlog.events.length > 200) rlog.events.splice(0, 50);
     if (e.kind === "eat") { velaEvents.push({ id: e.id, clip: "Collect" }); sound.chime(panOf(e.x)); sound.voice("content", panOf(world.x)); seedFx(e.index, 0); }
     else if (e.kind === "grow") seedFx(e.index, 1);
     else if (e.kind === "enter_shelter") { /* soft brush of fronds */ }
@@ -330,6 +340,10 @@ function interpretBehavior(obs, probs) {
   // voice: rare, tied to real state changes
   const pan = panOf(world.x);
   if (heard && !b.prevHeard && !world.inShelter) sound.voice("startle", pan, 0.8);
+  if (heard !== b.prevHeard) rlog.events.push({ tick: world.t, text: heard ? "predator heard (hearing input > 0)" : "predator no longer heard" });
+  if (seesPred && !b.prevSees) rlog.events.push({ tick: world.t, text: "predator in sight (ray channel 4)" });
+  b.prevSees = seesPred;
+  if (world.energy < 0.25 && !b.lowLogged) { rlog.events.push({ tick: world.t, text: "energy below 0.25" }); b.lowLogged = true; } else if (world.energy > 0.35) b.lowLogged = false;
   if (label.startsWith("Fleeing")) sound.voice("flee", pan);
   if (label === "Resting, sheltered" || label === "Resting") sound.voice("murmur", pan);
   if (label === "Exploring" && Math.random() < 0.004) sound.voice("curious", pan);
@@ -550,6 +564,21 @@ function drawProbs(probs, chosen) {
   if (!el.childElementCount) for (let i = 0; i < 8; i++) { const a = document.createElement("span"); a.textContent = ACTION_LABELS[i]; const b = document.createElement("span"); b.appendChild(document.createElement("i")); el.append(a, b); }
   for (let i = 0; i < 8; i++) { const lab = el.children[2 * i], bar = el.children[2 * i + 1].firstChild; lab.className = i === chosen ? "chosen" : ""; bar.style.width = `${(probs[i] * 100).toFixed(0)}%`; }
 }
+
+// ------------------------------------------------------------------ research console API (read-only + seed restart)
+const researchApi = {
+  state: () => cur && { obs: cur.obs, probs: cur.probs, action: cur.action, value: rlog.value, rewardTrace: rlog.rewardTrace, events: rlog.events },
+  rayRel: () => RAY_REL,
+  seed: () => world?.seed,
+  restart: (seed) => { newEpisode(seed); toast(`Restarted seed ${seed} with the same brain.`, 2200); },
+  brainMeta: () => brain && { ...brain.meta, spec: policies[brainKey].bundle.world_spec_version, hidden: policies[brainKey].bundle.hyperparameters_hidden || policies[brainKey].bundle.network.layers.slice(0, -1).map((l) => l.b.length) },
+  paramCount: () => { const b = policies[brainKey]?.bundle; if (!b) return 0; const n = (net) => net.reduce((a, l) => a + l.b.length * (1 + l.w.length), 0); return n(b.network.layers) + (b.value_network ? n(b.value_network.layers) : 0); },
+  brains: () => Object.keys(policies).map((k) => ({ key: k, label: $("brain").querySelector(`option[value="${k}"]`)?.textContent || k })),
+  brainByKey: (k) => policies[k].p,
+  brainLabel: (k) => $("brain").querySelector(`option[value="${k}"]`)?.textContent || k,
+  log: (e) => rlog.events.push({ tick: world?.t, text: e.text }),
+};
+initResearch(researchApi);
 
 // ------------------------------------------------------------------ boot
 async function boot() {

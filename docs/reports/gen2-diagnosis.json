@@ -1,0 +1,19 @@
+{
+  "schema": "genesis.report/1",
+  "title": "gen2 behavioral diagnosis",
+  "measured_at": "2026-11-18T16:05Z",
+  "world_spec_version": "2.0.0",
+  "family": "standard",
+  "episodes": 60,
+  "seeds": "held-out: 3000000000 + 0..59 (family offset 0)",
+  "policy_selection": "deterministic argmax",
+  "rows": {
+    "gen2-s2 best (14.0M steps)": {"ticks": 666.08, "caught": 0.70, "food": 11.90, "shelter_when_threat": 0.0033, "dash_when_threat": 0.1417, "shelter_at_night": 0.0040, "rest_frac": 0.0003, "survived": 0.1833},
+    "gen2-s2 latest (32.7M steps)": {"ticks": 659.95, "caught": 0.70, "food": 12.63, "shelter_when_threat": 0.0031, "dash_when_threat": 0.2061, "shelter_at_night": 0.0038, "rest_frac": 0.0046, "survived": 0.2333},
+    "scripted survivor (evaluation-only baseline)": {"ticks": 639.50, "caught": 0.4667, "food": 7.77, "shelter_when_threat": 0.2215, "dash_when_threat": 0.199, "shelter_at_night": 0.0902, "rest_frac": 0.058, "survived": 0.0833},
+    "gen2-s2 best, no predator": {"ticks": 1285.87, "caught": 0.0, "food": 26.65, "survived": 0.80}
+  },
+  "finding": "gen2 learned efficient foraging (+53% seeds vs the scripted survivor) but not hiding: 0.3% of threatened time in shelter vs 22% for the survivor; caught in 70% of episodes vs 47%. Held-out survival plateaued after ~14M steps.",
+  "cause_hypothesis": "Discovery problem, not a reward bug: meadows were placed >= 2.2 u from any shelter edge in a 24x16 world, so the payoff of hiding is delayed and rarely experienced.",
+  "change": "World v2.1.0 (meadows 2-4 u from a shelter edge; stalking audible at 2.5 u) and a fresh lineage gen3 from random weights. No reward for hiding was added."
+}

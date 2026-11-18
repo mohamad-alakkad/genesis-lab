@@ -18,6 +18,17 @@ export function loadPolicy(bundle, specVersion) {
     }
     return h;
   };
+  const mlp = (net, obs) => {
+    let h = new Float64Array(obs.length);
+    for (let i = 0; i < obs.length; i++) h[i] = Math.min(clip, Math.max(-clip, (obs[i] - mean[i]) / Math.sqrt(vr[i] + epsilon)));
+    for (const L of net) {
+      const out = new Float64Array(L.b.length);
+      for (let j = 0; j < L.b.length; j++) { let s = 0; for (let i = 0; i < h.length; i++) s += h[i] * L.w[i][j]; out[j] = L.activation === "tanh" ? Math.tanh(s + L.b[j]) : s + L.b[j]; }
+      h = out;
+    }
+    return h;
+  };
+  const value = bundle.value_network ? (obs) => mlp(bundle.value_network.layers, obs)[0] : null;
   const act = (obs) => { const z = logits(obs); let b = 0; for (let i = 1; i < z.length; i++) if (z[i] > z[b]) b = i; return { action: b, logits: z }; };
-  return { logits, act, meta: { milestone: bundle.milestone, step: bundle.training_step, source: bundle.source_checkpoint_id } };
+  return { logits, act, value, meta: { milestone: bundle.milestone, step: bundle.training_step, source: bundle.source_checkpoint_id } };
 }

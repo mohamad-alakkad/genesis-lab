@@ -1,6 +1,6 @@
 # GENESIS — Project state
 
-**Updated:** 2026-11-18 16:00Z · **Phase:** W5 gen2 cloud training (~30M/60M steps) · W9 preview live
+**Updated:** 2026-11-18 16:00Z · **Phase:** W5 gen2 cloud training (~30M/60M steps) · W9 preview live + Research Console (deployed 16:18Z, version 894fce0f)
 **Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (noindex Worker; brains = gen2-s2 dev checkpoints; rollback: `wrangler delete --name genesis-preview-3b416cc0d8`)
 **Next action:** `python -m genesis status --remote genesis-store-gen2-s1,genesis-store-gen2-s2,genesis-store-gen2-s3,genesis-store-gen2-s4` (one call, no polling)
 
@@ -44,7 +44,9 @@ Disable the hourly trigger (`RemoteTrigger update enabled:false`) when all gen2 
 
 ## Open problems / questions for the user
 - gen2 learning flattening at ~750 survival ticks (survivor baseline 711), caught ≈ 0.7: diagnose after 60M (next-change ladder: observation/reward audit before hyperparameters)
-- Visual/audio: verified in a real Chrome (desktop); phone and listening test not yet done; 5-critic review protocol queued for after training
+- Visual/audio: desktop verified in real Chrome (scene, Research Console: overview/live/training/experiments); phone layout NOT verified (window resize unavailable); audio not listened to; 5-critic review queued for after training
+- Store oddity: running gen2 seeds sometimes show a stale CLEAN_EXIT in the published snapshot; console uses publish age instead; investigate in persist/fetch
+- gen3 (world 2.1.0) starts with the 16:57Z hourly cycle; refresh `python -m genesis.research` + re-export + redeploy when gen3 brains exist (site must switch to the 2.1.0 sim files at the same time)
 - Publishing the visual pack in the public repo (default: keep `design/` local; the web build ships only the assets it needs) — 2026-11-18
 
 ## Pointers

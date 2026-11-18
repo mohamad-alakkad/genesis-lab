@@ -45,7 +45,7 @@ Disable the hourly trigger (`RemoteTrigger update enabled:false`) when all gen2 
 ## Open problems / questions for the user
 - gen2 learning flattening at ~750 survival ticks (survivor baseline 711), caught ≈ 0.7: diagnose after 60M (next-change ladder: observation/reward audit before hyperparameters)
 - Visual/audio: desktop verified in real Chrome (scene, Research Console: overview/live/training/experiments); phone layout NOT verified (window resize unavailable); audio not listened to; 5-critic review queued for after training
-- Store oddity: running gen2 seeds sometimes show a stale CLEAN_EXIT in the published snapshot; console uses publish age instead; investigate in persist/fetch
+- gen2-s1 (38.0M) and gen2-s2 (34.0M) ended by the programmed plateau criterion (clean exit: plateau), confirming the plateau finding; s3/s4 still finishing their cycle
 - gen3 (world 2.1.0) starts with the 16:57Z hourly cycle; refresh `python -m genesis.research` + re-export + redeploy when gen3 brains exist (site must switch to the 2.1.0 sim files at the same time)
 - Publishing the visual pack in the public repo (default: keep `design/` local; the web build ships only the assets it needs) — 2026-11-18
 

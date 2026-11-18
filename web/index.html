@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GENESIS</title>
+<meta name="description" content="A small creature, Vela, learning to survive in the Fold. Every decision comes from a neural policy trained from scratch.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Instrument+Serif&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="src/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-label="The Fold: a live simulation of Vela"></canvas>
+
+<header class="brand"><div class="wordmark">GENESIS</div><div class="tagline">a small life, learning to survive</div></header>
+
+<section class="specimen" aria-live="polite">
+  <div class="spec-name">Vela <span class="mono" id="brainTag">·</span></div>
+  <div class="state" id="stateLabel">—</div>
+  <div class="gauges">
+    <label>energy<span class="bar"><i id="energyBar"></i></span></label>
+    <label>stamina<span class="bar"><i id="staminaBar"></i></span></label>
+  </div>
+  <div class="world mono" id="worldLine">—</div>
+</section>
+
+<nav class="tools" aria-label="Visitor actions">
+  <button data-tool="seed" title="Move a seed to open ground"><svg viewBox="0 0 24 24"><path d="M12 3c3 4 5 7 5 10a5 5 0 0 1-10 0c0-3 2-6 5-10z"/></svg><span>Seed</span></button>
+  <button data-tool="slate" title="Place a slate"><svg viewBox="0 0 24 24"><path d="M4 14l8-4 8 4-8 4z"/><path d="M4 11l8-4 8 4"/></svg><span>Slate</span></button>
+  <button data-tool="vent" title="Wake a vent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" stroke-dasharray="3 2.4"/><circle cx="12" cy="12" r="2"/></svg><span>Vent</span></button>
+  <button data-tool="sound" title="Make a sound: the predator will search here"><svg viewBox="0 0 24 24"><path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 11v2"/></svg><span>Sound</span></button>
+</nav>
+
+<aside class="panel" id="panel">
+  <div class="row"><span class="mono lbl">brain</span><select id="brain" aria-label="Policy"></select></div>
+  <div class="row"><label class="toggle"><input type="checkbox" id="mind"> <span>mind view</span></label>
+    <span class="mono lbl">speed</span><select id="speed" aria-label="Simulation speed"><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></div>
+  <div class="row"><button id="mute" class="small" aria-pressed="false">sound on</button><input id="volume" type="range" min="0" max="1" step="0.01" value="0.7" aria-label="Volume"></div>
+  <div class="probs" id="probs" hidden></div>
+  <p class="honesty mono" id="honesty"></p>
+</aside>
+
+<div class="toast" id="toast" role="status"></div>
+<div class="veil" id="veil">
+  <div class="veil-inner">
+    <div class="wordmark big">GENESIS</div>
+    <p>Somewhere in the Fold, a small creature named Vela is trying to live through the night.</p>
+    <p class="mono note">Nothing here is scripted: every movement Vela makes is chosen by a neural network that learned, from random weights, by living thousands of lives.</p>
+    <button id="enter">Enter the Fold</button>
+    <p class="mono note small" id="loadNote">loading…</p>
+  </div>
+</div>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

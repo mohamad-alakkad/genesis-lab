@@ -1,0 +1,65 @@
+:root {
+  --abyss: #070D17; --ocean: #102D39; --life: #46E7D7; --neural: #8E73FF; --energy: #FFB36B; --hazard: #F2978A;
+  --text: #ECF5F4; --muted: #C0D4D5; --scrim: rgba(7, 13, 23, 0.62);
+  --display: "Instrument Serif", Georgia, serif; --ui: Inter, Arial, sans-serif; --mono: "IBM Plex Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--abyss); color: var(--text); font-family: var(--ui); overflow: hidden; }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.mono { font-family: var(--mono); }
+.brand { position: fixed; top: max(18px, env(safe-area-inset-top)); left: 4%; pointer-events: none; }
+.wordmark { font-family: var(--display); font-size: 30px; letter-spacing: 0.28em; }
+.wordmark.big { font-size: 84px; }
+.tagline { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--muted); text-transform: lowercase; opacity: 0.8; }
+.specimen { position: fixed; left: 4%; bottom: max(22px, env(safe-area-inset-bottom)); width: 270px; padding: 14px 16px;
+  background: var(--scrim); border: 1px solid rgba(70, 231, 215, 0.16); border-radius: 12px; backdrop-filter: blur(6px); }
+.spec-name { font-family: var(--display); font-size: 24px; }
+.spec-name .mono { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; margin-left: 6px; vertical-align: middle; }
+.state { font-size: 13px; color: var(--life); letter-spacing: 0.12em; text-transform: uppercase; margin: 2px 0 10px; min-height: 16px; transition: color .6s; }
+.state.danger { color: var(--hazard); }
+.gauges label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--muted); letter-spacing: 0.12em; margin: 4px 0; }
+.bar { flex: 1; max-width: 170px; height: 4px; background: rgba(236, 245, 244, 0.12); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 50%; background: var(--energy); transition: width .25s linear; }
+#staminaBar { background: var(--neural); }
+.world { font-size: 10px; color: var(--muted); margin-top: 8px; letter-spacing: 0.06em; }
+.tools { position: fixed; right: 4%; bottom: max(22px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+.tools button, button#enter, button.small { font-family: var(--ui); color: var(--text); background: var(--scrim); border: 1px solid rgba(236, 245, 244, 0.18);
+  border-radius: 10px; cursor: pointer; backdrop-filter: blur(6px); }
+.tools button { width: 72px; height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; }
+.tools svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tools button[data-tool="seed"] svg { stroke: var(--energy); } .tools button[data-tool="vent"] svg { stroke: var(--hazard); }
+.tools button[aria-pressed="true"] { border-color: var(--life); box-shadow: 0 0 0 1px var(--life) inset; }
+.tools button:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--life); outline-offset: 2px; }
+.panel { position: fixed; top: max(16px, env(safe-area-inset-top)); right: 4%; width: 250px; padding: 10px 12px; background: var(--scrim);
+  border: 1px solid rgba(236, 245, 244, 0.1); border-radius: 12px; font-size: 12px; backdrop-filter: blur(6px); }
+.panel .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.panel .lbl { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; }
+.panel select { flex: 1; background: transparent; color: var(--text); border: 1px solid rgba(236,245,244,.2); border-radius: 6px; padding: 4px; font: inherit; }
+.panel select option { background: var(--abyss); }
+.panel input[type=range] { flex: 1; accent-color: var(--life); }
+.toggle { display: flex; align-items: center; gap: 6px; flex: 1; cursor: pointer; }
+button.small { padding: 5px 10px; font-size: 11px; }
+.probs { display: grid; grid-template-columns: 70px 1fr; gap: 3px 8px; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 6px; }
+.probs i { display: block; height: 6px; margin-top: 3px; background: var(--neural); border-radius: 2px; transition: width .1s linear; }
+.probs .chosen { color: var(--life); } .probs .chosen + span i { background: var(--life); }
+.honesty { font-size: 9.5px; color: var(--muted); opacity: .75; line-height: 1.45; margin: 8px 0 0; }
+.toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); padding: 10px 16px; border-radius: 10px; background: var(--scrim);
+  font-size: 13px; opacity: 0; transition: opacity .5s; pointer-events: none; text-align: center; max-width: 86vw; }
+.toast.show { opacity: 1; }
+.veil { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 60% 40%, rgba(16,45,57,.55), rgba(7,13,23,.96) 70%);
+  transition: opacity 1.4s; z-index: 10; padding: 20px; }
+.veil.gone { opacity: 0; pointer-events: none; }
+.veil-inner { max-width: 560px; text-align: center; }
+.veil p { font-family: var(--display); font-size: 22px; line-height: 1.35; color: var(--text); }
+.veil p.note { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.6; }
+button#enter { margin-top: 10px; padding: 14px 28px; font-size: 14px; letter-spacing: 0.12em; border-color: var(--life); min-height: 46px; }
+@media (max-width: 650px) {
+  .wordmark { font-size: 22px; } .wordmark.big { font-size: 52px; } .veil p { font-size: 18px; }
+  .brand { left: 20px; }
+  .panel { left: 20px; right: 20px; width: auto; top: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 210px); padding: 6px 10px; }
+  .panel .honesty { display: none; }
+  .specimen { left: 20px; right: 20px; width: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 70px); padding: 10px 12px; }
+  .tools { left: 20px; right: 20px; justify-content: space-between; bottom: max(14px, env(safe-area-inset-bottom)); }
+  .tools button { flex: 1; height: 50px; }
+}
+@media (prefers-reduced-motion: reduce) { .bar i, .state, .toast, .veil { transition: none; } }

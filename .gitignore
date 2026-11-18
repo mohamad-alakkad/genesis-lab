@@ -10,3 +10,4 @@ web/dist/
 design/
 web/test/fixtures/
 web/public/assets/
+web/src/vela-controller.mjs

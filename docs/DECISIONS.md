@@ -19,3 +19,5 @@
 - 2026-11-18 v2 network 2×128 tanh, 256 envs, eval every 2M steps, score = held-out mean survival ticks; plateau = no +15 ticks over 10 evals; target = survival rate ≥ 0.9 twice.
 - 2026-11-18 Cloud cycles: hourly routine, 45-min `cloud/cycle.sh` with 4 seeds (one BLAS thread each), publish every 8 min; resume refuses (exit 7) if another trainer's heartbeat is < 15 min old without a clean exit; finished runs are a no-op.
 - 2026-11-18 Presentation (later, W9): procedural Web Audio voice + ambience driven only by sim state; behavioral "states" shown are derived labels, not claims of feeling.
+- 2026-11-18 Preview deploy (user request): standalone static Worker on workers.dev (Pages API not permitted: 403/10000), noindex, no custom domain. Rollback = `wrangler delete --name genesis-preview-3b416cc0d8`. Ships Vela.glb + controller from the design pack (user asked for the public preview).
+- 2026-11-18 Render fixes found in a real-GPU browser: fog range swallowed all objects (camera 40 u away), camera too far (Vela too small), near-side rock forms blocked the view, clock offset; lite tier (no MSAA, standard materials) for phones/software GL; fonts non-blocking.

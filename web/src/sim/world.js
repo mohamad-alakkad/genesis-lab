@@ -5,7 +5,8 @@ import C from "./world_constants.json" with { type: "json" };
 export const SPEC_VERSION = C.world_spec_version;
 export const N_ACTIONS = C.actions.length;
 export const N_CH = 6;
-export const OBS_DIM = C.n_rays * N_CH + 15 + N_ACTIONS;
+export const N_MEM = 5;  // memory of Vela's own last predator percept (2.2.0)
+export const OBS_DIM = C.n_rays * N_CH + 15 + N_MEM + N_ACTIONS;
 export const CONSTANTS = C;
 export const MODES = ["patrol", "hunt", "search", "rest"];
 const TWO_PI = 2 * Math.PI;
@@ -161,6 +162,8 @@ export class World {
     this.inShelter = this.shelters.some((s) => s.on && norm2(s.x - this.x, s.y - this.y) < s.r);
     this.epFood = 0; this.dead = false; this.caught = false; this.truncated = false;
     this.events = [];
+    this.memT = 1000000; this.memX = 0; this.memY = 0; this.memPounce = false;
+    this.updateMemory();
   }
 
   // ---- visitor / perturbation mutations (same clearance rules as Python)
@@ -341,7 +344,36 @@ export class World {
     reward += caught ? c.reward_caught : starve ? c.reward_starve : 0.0;
     this.dead = dead; this.caught = caught; this.truncated = !dead && this.t >= c.max_ticks;
     if (caught) this.emit("caught"); else if (starve) this.emit("starved");
+    this.updateMemory();
     return { reward, dead, caught, truncated: this.truncated, dashing };
+  }
+
+  predatorPercept() {  // seen on any ray within light-limited sight, or heard (same rule as Python)
+    const c = this.c, p = this.pred, light = this.light();
+    const sight = c.pred_sight_night + (c.pred_sight_day - c.pred_sight_night) * light, r2 = c.predator_radius * c.predator_radius;
+    let seen = false;
+    if (p.on) for (let k = 0; k < c.n_rays; k++) {
+      const ang = this.heading + RAY_REL[k], dx = Math.cos(ang), dy = Math.sin(ang), ox = p.x - this.x, oy = p.y - this.y;
+      const proj = ox * dx + oy * dy, perp2 = ox * ox + oy * oy - proj * proj;
+      if (!(perp2 <= r2)) continue;
+      const thc = Math.sqrt(Math.max(r2 - perp2, 0.0)), t0 = proj - thc, t1 = proj + thc, t = t0 >= 0 ? t0 : t1 >= 0 ? 0.0 : Infinity;
+      if (t <= sight) { seen = true; break; }
+    }
+    let hr = p.mode === HUNT ? (p.pounce ? c.hear_hunt : c.hear_stalk) : c.hear_calm;
+    if (this.raining) hr = hr * c.rain_hear;
+    const heard = p.on && p.mode !== REST && norm2(p.x - this.x, p.y - this.y) < hr;
+    return { seen, heard };
+  }
+  updateMemory() {
+    const { seen, heard } = this.predatorPercept();
+    if (seen || heard) { this.memT = 0; this.memX = this.pred.x; this.memY = this.pred.y; this.memPounce = this.pred.pounce && this.pred.mode === HUNT; }
+    else this.memT += 1;
+  }
+  memoryFeatures() {
+    const c = this.c, rec = Math.exp(-Math.min(this.memT, 100000) / c.memory_tau);
+    const rx = this.memX - this.x, ry = this.memY - this.y, b = Math.atan2(ry, rx) - this.heading;
+    const prox = Math.max(0.0, 1.0 - norm2(rx, ry) / c.memory_range);
+    return [rec, Math.sin(b) * rec, Math.cos(b) * rec, prox * rec, (this.memPounce ? 1 : 0) * rec];
   }
 
   observe() {
@@ -384,7 +416,9 @@ export class World {
       this.inWater ? 1 : 0, this.contact ? 1 : 0, light, this.raining ? 1 : 0, Math.sin(phase), Math.cos(phase),
       heard ? 1.0 - dpr / hr : 0.0, heard ? Math.sin(bearing) : 0.0, heard ? Math.cos(bearing) : 0.0];
     for (let i = 0; i < selfv.length; i++) out[S + i] = selfv[i];
-    out[S + selfv.length + this.lastAction] = 1;
+    const mem = this.memoryFeatures();
+    for (let i = 0; i < N_MEM; i++) out[S + selfv.length + i] = mem[i];
+    out[S + selfv.length + N_MEM + this.lastAction] = 1;
     return out;
   }
 

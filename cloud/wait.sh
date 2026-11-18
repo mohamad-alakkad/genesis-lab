@@ -4,11 +4,11 @@ cd "$(git rev-parse --show-toplevel)"
 end=$((SECONDS+540))
 while [ $SECONDS -lt $end ]; do
   alive=0
-  for f in runs/cycle-s*.pid; do kill -0 "$(cat $f)" 2>/dev/null && alive=1; done
+  for f in runs/cycle-*.pid; do kill -0 "$(cat $f)" 2>/dev/null && alive=1; done
   [ $alive -eq 0 ] && break
   sleep 20
 done
-for f in runs/cycle-s*.log; do echo "$f: $(grep -E 'EXIT|trainer ended|previous end' $f | tail -2 | tr '\n' ' ')"; done
+for f in runs/cycle-*.log; do echo "$f: $(grep -E 'EXIT|trainer ended|previous end' $f | tail -2 | tr '\n' ' ')"; done
 python3 - <<'PY'
 import json, pathlib
 for p in sorted(pathlib.Path("runs").glob("gen*-s*/heartbeat.json")):

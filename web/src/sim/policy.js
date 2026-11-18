@@ -3,10 +3,11 @@ export function loadPolicy(bundle, specVersion) {
   if (bundle.schema !== "genesis.policy/1") throw new Error("unknown policy schema");
   if (specVersion && bundle.world_spec_version !== specVersion) throw new Error(`policy spec ${bundle.world_spec_version} != world ${specVersion}`);
   const { mean, var: vr, clip, epsilon } = bundle.normalization;
+  const maskIdx = bundle.input_mask || [];  // ablation runs: inputs the network was trained without are zeroed, exactly as in training
   const layers = bundle.network.layers;
   const logits = (obs) => {
     let h = new Float64Array(obs.length);
-    for (let i = 0; i < obs.length; i++) h[i] = Math.min(clip, Math.max(-clip, (obs[i] - mean[i]) / Math.sqrt(vr[i] + epsilon)));
+    for (let i = 0; i < obs.length; i++) h[i] = Math.min(clip, Math.max(-clip, ((maskIdx.includes(i) ? 0 : obs[i]) - mean[i]) / Math.sqrt(vr[i] + epsilon)));
     for (const L of layers) {
       const out = new Float64Array(L.b.length);
       for (let j = 0; j < L.b.length; j++) {
@@ -20,7 +21,7 @@ export function loadPolicy(bundle, specVersion) {
   };
   const mlp = (net, obs) => {
     let h = new Float64Array(obs.length);
-    for (let i = 0; i < obs.length; i++) h[i] = Math.min(clip, Math.max(-clip, (obs[i] - mean[i]) / Math.sqrt(vr[i] + epsilon)));
+    for (let i = 0; i < obs.length; i++) h[i] = Math.min(clip, Math.max(-clip, ((maskIdx.includes(i) ? 0 : obs[i]) - mean[i]) / Math.sqrt(vr[i] + epsilon)));
     for (const L of net) {
       const out = new Float64Array(L.b.length);
       for (let j = 0; j < L.b.length; j++) { let s = 0; for (let i = 0; i < h.length; i++) s += h[i] * L.w[i][j]; out[j] = L.activation === "tanh" ? Math.tanh(s + L.b[j]) : s + L.b[j]; }

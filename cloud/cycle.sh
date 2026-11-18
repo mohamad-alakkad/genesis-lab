@@ -18,15 +18,25 @@ PY
 cat runs/cloud_env.json
 python3 -m pytest -q -x tests 2>&1 | tail -1
 for S in $SEEDS; do
-  ( export GENESIS_STORE_BRANCH=genesis-store-$LINEAGE-s$S
-    RUN=$LINEAGE-s$S
-    python3 -m genesis resume --run $RUN --foreground --minutes $MIN --set publish_minutes=8 --set ckpt_minutes=4
+  # a token from cloud/conditions.json (controlled experiments) or a plain seed number
+  read RUN SEED SETS < <(python3 - "$S" "$LINEAGE" <<'PY'
+import json, sys
+tok, lin = sys.argv[1], sys.argv[2]
+c = json.load(open("cloud/conditions.json"))["tokens"].get(tok) if tok[0].isalpha() else None
+if c:
+    print(c["run"], c["seed"], " ".join(f"--set {k}={json.dumps(v, separators=(',', ':'))}" for k, v in c["set"].items()))
+else:
+    print(f"{lin}-s{tok}", tok, "--set publish_minutes=8 --set ckpt_minutes=4 --set total_steps=60000000")
+PY
+)
+  ( export GENESIS_STORE_BRANCH=genesis-store-$RUN
+    python3 -m genesis resume --run $RUN --foreground --minutes $MIN $SETS
     rc=$?
     if [ $rc -eq 3 ]; then
-      python3 -m genesis train --run $RUN --seed $S --foreground --minutes $MIN --set publish_minutes=8 --set ckpt_minutes=4 --set total_steps=${GENESIS_TOTAL_STEPS:-60000000}
+      python3 -m genesis train --run $RUN --seed $SEED --foreground --minutes $MIN $SETS
       rc=$?
     fi
-    echo "EXIT $rc" ) > runs/cycle-s$S.log 2>&1 &
-  echo $! > runs/cycle-s$S.pid
+    echo "EXIT $rc" ) > runs/cycle-$S.log 2>&1 &
+  echo $! > runs/cycle-$S.pid
 done
 echo "STARTED seeds: $SEEDS for $MIN min"

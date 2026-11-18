@@ -18,9 +18,8 @@ S = N_CH * C["n_rays"]
 
 
 def policy_from(d):
-    p, _, _, mu, var = ckpt.unpack((Path(d) / "model.npz").read_bytes())
-    n = ppo.RunningNorm(len(mu)); n.mean = mu; n.var = var
-    return lambda o: ppo.policy_logits(p, n(o)).argmax(1)
+    from genesis.evalreport import load_policy
+    return load_policy(Path(d))
 
 
 def record(act, n, family="standard"):

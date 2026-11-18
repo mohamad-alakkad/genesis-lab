@@ -27,6 +27,7 @@ def bundle(d, milestone):
                                        "activation": "tanh" if k < L - 1 else "linear"} for k in range(L)],
                            "output": "state value V(s) (critic, training-time estimate of discounted return)"},
          "hyperparameters_hidden": [len(p[f"pi.b{k}"]) for k in range(L - 1)],
+         "input_mask": json.loads((d / "state.json").read_text()).get("config", {}).get("obs_mask") or [],
          "eval_summary": man.get("eval_summary")}
     b["checksum"] = hashlib.sha256(json.dumps(b, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return b

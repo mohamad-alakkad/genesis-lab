@@ -1,0 +1,125 @@
+{
+ "experiment": "gen4 2x2: memory inputs (on/masked) x gamma (0.99/0.997), world 2.2.0, paired init seeds 1-2",
+ "tokens": {
+  "A1": {
+   "run": "gen4-mem-g99-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.99,
+    "obs_mask": []
+   }
+  },
+  "A2": {
+   "run": "gen4-mem-g99-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.99,
+    "obs_mask": []
+   }
+  },
+  "A3": {
+   "run": "gen4-mem-g997-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": []
+   }
+  },
+  "A4": {
+   "run": "gen4-mem-g997-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": []
+   }
+  },
+  "B1": {
+   "run": "gen4-nomem-g99-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.99,
+    "obs_mask": [
+     81,
+     82,
+     83,
+     84,
+     85
+    ]
+   }
+  },
+  "B2": {
+   "run": "gen4-nomem-g99-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.99,
+    "obs_mask": [
+     81,
+     82,
+     83,
+     84,
+     85
+    ]
+   }
+  },
+  "B3": {
+   "run": "gen4-nomem-g997-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [
+     81,
+     82,
+     83,
+     84,
+     85
+    ]
+   }
+  },
+  "B4": {
+   "run": "gen4-nomem-g997-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 40000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [
+     81,
+     82,
+     83,
+     84,
+     85
+    ]
+   }
+  }
+ }
+}

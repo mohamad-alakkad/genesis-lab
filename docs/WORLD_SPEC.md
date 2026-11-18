@@ -1,6 +1,6 @@
 # GENESIS world specification
 
-**Version:** 2.1.0 · **Status:** frozen for lineage gen3 · **Changelog:** 1.0.0 seeds/vents/slates, tag `v1-baseline` · 2.0.0 living world (gen2) · 2.1.0 meadows at thicket edges (2–4 u from a shelter edge), stalk hearing 1.5 → 2.5 (gen2 never discovered hiding: 0.3% shelter use under threat)
+**Version:** 2.2.0 · **Status:** frozen for lineage gen4 · **Changelog:** 2.2.0 adds 5 memory inputs (Vela's own last predator percept; updated at the end of each step/reset; obs 89 → 94) · 1.0.0 seeds/vents/slates, tag `v1-baseline` · 2.0.0 living world (gen2) · 2.1.0 meadows at thicket edges (2–4 u from a shelter edge), stalk hearing 1.5 → 2.5 (gen2 never discovered hiding: 0.3% shelter use under threat)
 
 All numbers live in `genesis/world_constants.json`, shared byte-for-byte with the JS port. Reference implementation: `genesis/world.py`. Coordinates: x right, y **down**.
 
@@ -45,7 +45,8 @@ All numbers live in `genesis/world_constants.json`, shared byte-for-byte with th
 - Rays: 11 over ±120° (k = 0 leftmost), range 6. Channels per ray (index 6k + c): 0 solid (wall/slate), 1 seed, 2 active vent, 3 shelter, 4 predator (only if within sight = lerp(2.5 at night, 6 at noon)), 5 pool. Value = 1 − min(t, 6)/6.
 - 66 energy · 67 stamina · 68 v/0.22 · 69 ω/0.25 · 70 in_shelter · 71 in_vent · 72 in_water · 73 contact · 74 light · 75 raining · 76 sin(day phase) · 77 cos(day phase)
 - 78–80 hearing: predator within hearing radius (pounce 6, stalk 2.5, patrol/search 3; ×0.6 in rain; silent when resting) → proximity 1 − d/r, sin and cos of the bearing relative to heading (0 when not heard)
-- 81–88 one-hot of the last action (reset: rest)
+- 81–85 memory of the last predator percept (seen on a ray or heard): recency exp(−Δt/60), sin and cos of the bearing to where it was sensed relative to the current heading, remembered proximity max(0, 1 − d/8), was-pouncing; all × recency, 0 if never sensed
+- 86–93 one-hot of the last action (reset: rest)
 
 ## 6. Reward
 seed +1 · tick in an active vent −0.05 · starvation −1 · caught −2. Nothing else: no reward for hiding, resting or fleeing. Those must be learned as means to survive and eat.

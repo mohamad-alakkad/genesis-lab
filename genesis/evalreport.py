@@ -14,7 +14,12 @@ METRICS = ("ticks", "food", "caught", "survived", "shelter_when_threat", "shelte
 def load_policy(d: Path):
     p, _, _, mu, var = ckpt.unpack((d / "model.npz").read_bytes())
     norm = ppo.RunningNorm(len(mu)); norm.mean = mu; norm.var = var
-    return lambda o: ppo.policy_logits(p, norm(o)).argmax(1)
+    idx = json.loads((d / "state.json").read_text()).get("config", {}).get("obs_mask") or []
+    def act(o):
+        if idx:
+            o = o.copy(); o[:, idx] = 0.0
+        return ppo.policy_logits(p, norm(o)).argmax(1)
+    return act
 
 
 def baselines(n, families):

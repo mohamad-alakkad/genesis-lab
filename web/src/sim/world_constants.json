@@ -1,5 +1,5 @@
 {
-  "world_spec_version": "2.1.0",
+  "world_spec_version": "2.2.0",
   "width": 24.0,
   "height": 16.0,
   "creature_radius": 0.3,
@@ -82,6 +82,8 @@
   "predator_stalk": 0.05,
   "pounce_dist": 2.8,
   "hear_stalk": 2.5,
+  "memory_tau": 60.0,
+  "memory_range": 8.0,
   "predator_fatigue_max": 120,
   "predator_rest_ticks": 60,
   "predator_search_ticks": 50,

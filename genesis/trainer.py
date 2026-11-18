@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
     "publish_minutes": 30, "heartbeat_s": 30, "eval_every_steps": 2_000_000, "eval_episodes": 100,
     "target_survival": 0.9, "plateau_evals": 10, "plateau_eps": 15.0, "seed": 1,
     "rss_soft_mb": 1400, "rss_hard_mb": 1600, "host_min_avail_frac": 0.10,
-    "milestone_steps": {"early": 2_000_000},
+    "milestone_steps": {"early": 2_000_000}, "obs_mask": [],
 }
 
 
@@ -85,6 +85,13 @@ class Trainer:
         self.recent = {"food": [], "ticks": []}
         self.diag = {"entropy0": None, "entropy": None, "v_loss_med": None, "nan": False}
 
+    def mask(self, obs):
+        idx = self.cfg.get("obs_mask") or []
+        if not idx:
+            return obs
+        obs = obs.copy(); obs[:, idx] = 0.0
+        return obs
+
     # ------------------------------------------------------------------ io
     def checkpoint(self, milestones=(), eval_summary=None):
         st = dict(self.state)
@@ -141,8 +148,8 @@ class Trainer:
     # ------------------------------------------------------------------ eval
     def evaluate(self):
         from genesis.evalonly.suite import evaluate_policy  # eval module stays out of export paths
-        p, norm = self.params, self.norm
-        res = evaluate_policy(lambda o: ppo.policy_logits(p, norm(o)).argmax(1), ("standard",), self.cfg["eval_episodes"])["standard"]
+        p, norm, mask = self.params, self.norm, self.mask
+        res = evaluate_policy(lambda o: ppo.policy_logits(p, norm(mask(o))).argmax(1), ("standard",), self.cfg["eval_episodes"])["standard"]
         s = {"suite": "heldout-standard", "step": self.state["global_step"], "score": res["ticks"]["mean"],
              "score_ci95": res["ticks"]["ci95"], "food_mean": res["food"]["mean"], "survived": res["survived"]["mean"],
              "caught": res["caught"]["mean"], "shelter_when_threat": res["shelter_when_threat"]["mean"],
@@ -229,6 +236,7 @@ class Trainer:
             b_obs = np.zeros((T, E, OBS_DIM)); b_act = np.zeros((T, E), np.int64); b_logp = np.zeros((T, E))
             b_rew = np.zeros((T, E)); b_done = np.zeros((T, E)); b_val = np.zeros((T + 1, E))
             for t in range(T):
+                obs = self.mask(obs)
                 self.norm.update(obs)
                 x = self.norm(obs)
                 logits = ppo.policy_logits(self.params, x)
@@ -247,7 +255,7 @@ class Trainer:
                     for k in ("food", "ticks"):
                         self.recent[k] = (self.recent[k] + list(map(float, info[k])))[-200:]
                 obs = obs2
-            b_val[T] = ppo.mlp_forward(self.params, "v", self.norm(obs))[0][:, 0]
+            b_val[T] = ppo.mlp_forward(self.params, "v", self.norm(self.mask(obs)))[0][:, 0]
             # ---- GAE
             adv = np.zeros((T, E)); last = np.zeros(E)
             for t in range(T - 1, -1, -1):

@@ -140,3 +140,19 @@ def test_vecenv_autoreset_and_seed_ranges():
     s = v._seeds(); assert (s < C["train_seed_max"]).all()
     from genesis.evalonly.suite import eval_seeds
     assert eval_seeds("standard", 10).min() >= C["eval_seed_base"] > C["train_seed_max"]
+
+
+def test_memory_of_last_predator_percept():
+    from genesis.world import N_MEM
+    w = World(1, "standard"); w.reset(np.ones(1, bool), np.array([21]))
+    w.f = dict(w.f, p_food=0, p_obs=0, p_vent=0, p_alert=0)
+    w.pr_pos[0] = w.pos[0] + np.array([1.0, 0.0]); w.pr_mode[:] = HUNT  # heard (stalk radius 2.5)
+    w.step(np.array([7]))
+    m = w.observe()[0, -8 - N_MEM:-8]
+    assert m[0] == 1.0 and m[3] > 0  # just sensed, close
+    w.pr_pos[0] = w.pos[0] + np.array([20.0, 0.0]); w.pr_mode[:] = REST  # gone and silent
+    for _ in range(60):
+        w.step(np.array([7]))
+    m2 = w.observe()[0, -8 - N_MEM:-8]
+    assert abs(m2[0] - np.exp(-60 / C["memory_tau"])) < 1e-9  # recency decays exactly
+    assert np.all(np.abs(m2) <= 1.0)

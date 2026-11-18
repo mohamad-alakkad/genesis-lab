@@ -17,7 +17,8 @@ C = json.loads((Path(__file__).with_name("world_constants.json")).read_text())
 SPEC_VERSION = C["world_spec_version"]
 N_ACTIONS = len(C["actions"])
 N_CH = 6  # ray channels: solid, seed, vent, shelter, predator, water
-OBS_DIM = C["n_rays"] * N_CH + 15 + N_ACTIONS
+N_MEM = 5  # memory of Vela's own last predator percept (2.2.0)
+OBS_DIM = C["n_rays"] * N_CH + 15 + N_MEM + N_ACTIONS
 U32 = np.uint32
 TWO_PI = 2 * math.pi
 PATROL, HUNT, SEARCH, REST = 0, 1, 2, 3
@@ -72,6 +73,7 @@ class World:
         self.pr_on = np.zeros(E, bool); self.pr_pos = z(2); self.pr_heading = z(); self.pr_mode = np.zeros(E, np.int64)
         self.pr_timer = np.zeros(E, np.int64); self.pr_fatigue = z(); self.pr_target = z(2); self.pr_last = z(2)
         self.pr_speed = z(); self.pr_seen = np.zeros(E, bool); self.pr_pounce = np.zeros(E, bool)
+        self.mem_t = np.full(E, 10**6, np.int64); self.mem_pos = z(2); self.mem_pounce = np.zeros(E, bool)
         self.stat_keys = ("food", "hazard", "dist", "contact", "ret", "caught", "threat", "shelter_threat", "shelter",
                           "rest", "dash", "dash_threat", "night", "shelter_night")
         self.ep = {k: z() for k in self.stat_keys}
@@ -267,6 +269,8 @@ class World:
         self.contact[m] = False; self.in_hazard[m] = False; self.resting[m] = False
         d = _norm(self.sh_pos - self.pos[:, None, :])
         self.in_shelter[m] = np.any(self.sh_on & (d < self.sh_r), 1)[m]
+        self.mem_t[m] = 10**6; self.mem_pos[m] = 0.0; self.mem_pounce[m] = False
+        self._update_memory(m)
         for k in self.stat_keys:
             self.ep[k][m] = 0.0
 
@@ -520,9 +524,45 @@ class World:
         self.ep["caught"] += caught
         trunc = (~dead) & (self.t >= c["max_ticks"])
         self.ep["ret"] += reward
+        self._update_memory(np.ones(self.E, bool))
         return reward, dead, trunc
 
     # ----------------------------------------------------------------- observation
+    def _predator_percept(self):
+        """What Vela senses of the predator right now: seen on a ray (light-limited sight) or heard. Shared by memory and observe."""
+        c = self.c
+        light = self.light()
+        ang = self.heading[:, None] + self.ray_rel[None, :]
+        dx, dy = np.cos(ang), np.sin(ang)
+        ox = (self.pr_pos[:, 0] - self.pos[:, 0])[:, None]; oy = (self.pr_pos[:, 1] - self.pos[:, 1])[:, None]
+        proj = ox * dx + oy * dy; perp2 = ox * ox + oy * oy - proj * proj; r2 = c["predator_radius"] ** 2
+        thc = np.sqrt(np.maximum(r2 - perp2, 0.0)); t0 = proj - thc; t1 = proj + thc
+        t = np.where(perp2 <= r2, np.where(t0 >= 0, t0, np.where(t1 >= 0, 0.0, np.inf)), np.inf)
+        sight = c["pred_sight_night"] + (c["pred_sight_day"] - c["pred_sight_night"]) * light
+        seen = self.pr_on & np.any(t <= sight[:, None], 1)
+        hr = np.where(self.pr_mode == HUNT, np.where(self.pr_pounce, c["hear_hunt"], c["hear_stalk"]), c["hear_calm"])
+        hr = np.where(self.raining, hr * c["rain_hear"], hr)
+        dpr = _norm(self.pr_pos - self.pos)
+        heard = self.pr_on & (self.pr_mode != REST) & (dpr < hr)
+        return seen, heard
+
+    def _update_memory(self, mask):
+        seen, heard = self._predator_percept()
+        sensed = mask & (seen | heard)
+        self.mem_t = np.where(mask, np.where(sensed, 0, self.mem_t + 1), self.mem_t)
+        self.mem_pos = np.where(sensed[:, None], self.pr_pos, self.mem_pos)
+        self.mem_pounce = np.where(sensed, self.pr_pounce & (self.pr_mode == HUNT), self.mem_pounce)
+
+    def memory_features(self):
+        """5 inputs: recency exp(-Δt/τ); sin, cos of the bearing to where it was last sensed (relative to current heading);
+        remembered proximity; whether it was pouncing. All scaled by recency (0 when never sensed)."""
+        c = self.c
+        rec = np.exp(-np.minimum(self.mem_t, 10**5) / c["memory_tau"])
+        rel = self.mem_pos - self.pos
+        b = np.arctan2(rel[:, 1], rel[:, 0]) - self.heading
+        prox = np.maximum(0.0, 1.0 - _norm(rel) / c["memory_range"])
+        return np.stack([rec, np.sin(b) * rec, np.cos(b) * rec, prox * rec, self.mem_pounce * rec], 1)
+
     def observe(self) -> np.ndarray:
         c = self.c
         R, rng_ = c["n_rays"], c["ray_range"]
@@ -571,7 +611,7 @@ class World:
                           self.in_hazard * 1.0, self.in_water * 1.0, self.contact * 1.0, light, self.raining * 1.0,
                           np.sin(phase), np.cos(phase),
                           hp, np.where(heard, np.sin(bearing), 0.0), np.where(heard, np.cos(bearing), 0.0)], 1)
-        return np.concatenate([rays, selfv, onehot], 1)
+        return np.concatenate([rays, selfv, self.memory_features(), onehot], 1)
 
 
 class VecEnv:

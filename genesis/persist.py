@@ -54,6 +54,7 @@ def publish(run_dir: Path, run_id: str, retries=3, log=print):
     if not (store / ".git").exists():
         store.mkdir(parents=True, exist_ok=True)
         _git(["init", "-q"], store)
+        _git(["config", "core.autocrlf", "false"], store)
         _git(["config", "user.name", "genesis-trainer"], store)
         _git(["config", "user.email", "genesis-trainer@localhost"], store)
     lg = ckpt.read_last_good(run_dir)
@@ -85,6 +86,7 @@ def publish(run_dir: Path, run_id: str, retries=3, log=print):
               "published_at": ckpt.now_iso()}
     (store / "latest.json").write_text(json.dumps(latest, indent=1))
     (store / "README.md").write_text("GENESIS checkpoint store (machine-written; latest verified checkpoints only).\n")
+    (store / ".gitattributes").write_text("* -text\n")  # byte-exact files on every OS (checksums)
     _git(["checkout", "-q", "--orphan", f"pub{int(time.time())}"], store)
     _git(["add", "-A"], store)
     _git(["commit", "-q", "-m", f"checkpoint {lg}"], store)
@@ -114,7 +116,7 @@ def fetch(run_dir_parent: Path, log=print):
         return None
     tmp = Path(tempfile.mkdtemp(prefix="genesis-fetch-"))
     try:
-        r = subprocess.run(["git", "clone", "-q", "--depth", "1", "--branch", branch, remote, str(tmp / "s")],
+        r = subprocess.run(["git", "-c", "core.autocrlf=false", "clone", "-q", "--depth", "1", "--branch", branch, remote, str(tmp / "s")],
                            capture_output=True, text=True, timeout=300)
         if r.returncode != 0:
             log(f"fetch: no remote store available ({r.stderr.strip()[-200:]})")
@@ -154,7 +156,7 @@ def remote_summary(branch, remote=None):
     remote = remote or config()[0]
     tmp = Path(tempfile.mkdtemp(prefix="genesis-rs-"))
     try:
-        r = subprocess.run(["git", "clone", "-q", "--depth", "1", "--branch", branch, remote, str(tmp / "s")],
+        r = subprocess.run(["git", "-c", "core.autocrlf=false", "clone", "-q", "--depth", "1", "--branch", branch, remote, str(tmp / "s")],
                            capture_output=True, text=True, timeout=120)
         if r.returncode != 0:
             return f"{branch}: not published yet"

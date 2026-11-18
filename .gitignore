@@ -9,3 +9,4 @@ node_modules/
 web/dist/
 design/
 web/test/fixtures/
+web/public/assets/

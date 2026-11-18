@@ -112,7 +112,9 @@ const waterMat = new THREE.ShaderMaterial({ transparent: true, uniforms: { uTime
       float edge = smoothstep(1., .82, r);
       float rip = sin(r*24.-uTime*1.6)*.5+.5;
       float rr = length(vW-uRipple.xy); float age = uTime-uRipple.z; float ring = exp(-pow((rr-age*0.9)*5.,2.))*exp(-age*1.2);
-      float rain = uRain*step(.985, fract(sin(dot(floor(vW*6.+floor(uTime*3.)), vec2(12.9898,78.233)))*43758.5453));
+      vec2 cell = floor(vW*3.), f = fract(vW*3.) - .5; float seed = fract(sin(dot(cell + floor(uTime*1.5), vec2(12.9898,78.233)))*43758.5453);
+      float ra = fract(uTime*1.5), rd = length(f);  // round raindrop rings expanding in random cells
+      float rain = uRain * step(.82, seed) * smoothstep(.04, 0., abs(rd - ra*.45)) * (1.-ra);
       vec3 deep = mix(vec3(.02,.06,.10), vec3(.05,.2,.24), uLight);
       vec3 col = deep + vec3(.15,.55,.55)*(rip*.04 + ring*.5 + rain*.4) + vec3(.4,.9,.9)*(1.-edge)*.08;
       gl_FragColor = vec4(col, .82*edge + .1);
@@ -204,6 +206,10 @@ const shadeShadow = contactShadow(2.2); scene.add(shadeShadow);
 // ------------------------------------------------------------------ Vela
 let vela = null, velaRoot = new THREE.Group(), velaChild = new THREE.Group(); scene.add(velaRoot); velaRoot.add(velaChild);
 const velaShadow = contactShadow(1.0); scene.add(velaShadow);
+function puff(x, z, n = 4, size = 0.45) {
+  for (let i = 0; i < n; i++) { const d = dust.find((q) => q.userData.life <= 0); if (!d) return; if (!d.parent) scene.add(d);
+    d.userData = { life: 1, vx: (Math.random() - 0.5) * 0.6, vz: (Math.random() - 0.5) * 0.6, size }; d.position.set(x + (Math.random() - 0.5) * 0.2, 0.06, z + (Math.random() - 0.5) * 0.2); d.visible = true; }
+}
 const velaHalo = halo(pal.life, 1.4, 0.18); velaRoot.add(velaHalo); velaHalo.position.y = 0.2;
 
 // ------------------------------------------------------------------ rain and motes
@@ -227,7 +233,18 @@ const sound = new Soundscape();
 let world, policies = {}, brainKey = null, brain = null;
 let prev = null, cur = null, acc = 0, speed = 1, paused = false, episode = 0, lastProbs = null, lastAction = 7;
 let behave = { label: "", since: 0, prevHeard: false, prevShelter: false, wasLow: false, closing: 0, lastFoodD: Infinity, idleT: 0, threatT: 0 };
-let tool = null, endTimer = 0;
+let tool = null, endTimer = 0, dying = null, flinchT = 0;
+// ---- Vela's body: critically-damped-ish springs driven only by simulation quantities (v, ω, Δv, stamina, senses)
+const spring = () => ({ x: 0, v: 0 });
+const body = { pitch: spring(), roll: spring(), squash: spring(), twist: spring(), lift: spring(), phase: 0, glanceT: 0, glance: 0, accel: 0 };
+function springStep(sp, target, k, c, dt) {  // semi-implicit Euler in ≤4 ms substeps: stable for any frame time
+  const n = Math.max(1, Math.ceil(dt / 0.004)), h = dt / n;
+  for (let i = 0; i < n; i++) { sp.v += (k * (target - sp.x) - c * sp.v) * h; sp.x += sp.v * h; }
+  if (!Number.isFinite(sp.x) || !Number.isFinite(sp.v)) { sp.x = target; sp.v = 0; }
+  return sp.x;
+}
+const DUST_N = 14, dust = [];
+for (let i = 0; i < DUST_N; i++) { const d = halo(0xb9d6d2, 0.5, 0); d.visible = false; d.userData = { life: 0 }; dust.push(d); }
 
 async function loadBrains() {
   const names = ["final", "best", "middle", "early", "step0"];
@@ -260,8 +277,10 @@ function newEpisode(seed = null) {
   prev = cur = snap();
   camTarget.set(toX(world.x), 0, toZ(world.y)); placeCamera();
   shadeTrail.length = 0;
-  behave = { label: "", since: 0, prevHeard: false, prevShelter: world.inShelter, wasLow: false, closing: 0, lastFoodD: Infinity, idleT: 0, threatT: 0 };
-  endTimer = 0;
+  behave = { label: "", since: 0, prevHeard: false, prevShelter: world.inShelter, wasLow: false, closing: 0, lastFoodD: Infinity, idleT: 0, threatT: 0, danger: false, safeT: 0 };
+  endTimer = 0; dying = null; flinchT = 0;
+  if (vela) vela.freeze(false);
+  velaChild.rotation.set(0, 0, 0); velaChild.scale.set(1, 1, 1);
 }
 function snap() { const s = world.snapshot(); s.seedOn = world.food.map((f) => f.on); s.seedPos = world.food.map((f) => [f.x, f.y]); return s; }
 
@@ -291,9 +310,12 @@ function tick() {
 function endEpisode() {
   const days = (world.t / C.day_ticks).toFixed(1);
   const msg = world.caught ? `Vela was caught after ${days} days. The Fold goes quiet.` : world.dead ? `Vela ran out of energy after ${days} days.` : `Vela survived the whole span: ${days} days.`;
-  toast(msg + " A new life begins.", 4200);
-  if (world.caught) sound.thud(0, 40, 0.35);
-  endTimer = 4.5;
+  toast(msg + " A new life begins.", 5200);
+  const pan = panOf(world.x);
+  dying = { cause: world.caught ? "caught" : world.dead ? "starved" : "survived", t0: clock.elapsedTime };
+  if (world.caught) { sound.voice("deathCaught", pan); sound.thud(pan, 40, 0.3); sound.hush(3.5, 0.12); }
+  else if (world.dead) { setTimeout(() => sound.voice("lastBreath", pan), 900); sound.hush(4.5, 0.2); }
+  endTimer = world.dead ? 6.0 : 4.5;
 }
 
 // ------------------------------------------------------------------ events → visuals + sound
@@ -341,7 +363,7 @@ function interpretBehavior(obs, probs) {
   if (label !== b.label) { b.label = label; b.since = 0; }
   // voice: rare, tied to real state changes
   const pan = panOf(world.x);
-  if (heard && !b.prevHeard && !world.inShelter) sound.voice("startle", pan, 0.8);
+  if (heard && !b.prevHeard && !world.inShelter) { sound.voice("startle", pan, 0.8); body.squash.v -= 1.6; body.pitch.v += 1.2; }  // startle: a sharp involuntary flinch
   if (heard !== b.prevHeard) rlog.events.push({ tick: world.t, text: heard ? "predator heard (hearing input > 0)" : "predator no longer heard" });
   if (seesPred && !b.prevSees) rlog.events.push({ tick: world.t, text: "predator in sight (ray channel 4)" });
   b.prevSees = seesPred;
@@ -351,6 +373,11 @@ function interpretBehavior(obs, probs) {
   if (label === "Exploring" && Math.random() < 0.004) sound.voice("curious", pan);
   if (world.energy < 0.2 && Math.random() < 0.003) sound.voice("hungry", pan);
   if (world.stamina < 0.15 && Math.random() < 0.01) sound.voice("sigh", pan);
+  // vulnerability: tied to real events only
+  if (world.inHazard && !prev.inHazard) { sound.voice("hurt", pan); flinchT = 0.45; rlog.events.push({ tick: world.t, text: "entered an active vent (energy drain)" }); }
+  const dP = Math.hypot(p.x - world.x, p.y - world.y);
+  if (p.on && p.pounce && dP < 2.2 && !world.inShelter) { sound.voice("panic", pan); b.danger = true; }
+  if (b.danger && !threat && !world.dead) { b.safeT += TICK; if (b.safeT > 4) { sound.voice("relief", pan); b.danger = false; b.safeT = 0; rlog.events.push({ tick: world.t, text: "threat gone (relief)" }); } } else b.safeT = 0;
   if (world.inWater && !prev.inWater) { sound.splash(pan); lastRipple = groundU.uTime.value; waterMat.uniforms.uRipple.value.set(toX(world.x), toZ(world.y), lastRipple, 0); }
   // Vela clip events
   if (b.wasLow && world.energy > 0.3) { velaEvents.push({ id: `rec${world.t}`, clip: "Recover" }); b.wasLow = false; }
@@ -465,14 +492,53 @@ function render(dt, t, a) {
   const threat = behave.threatT > 0.2;
   const breath = reduceMotion ? 0 : Math.sin(t * Math.PI * 2 / (threat ? 1.1 : s.resting ? 3.6 : 2.8)) * (s.resting ? 0.03 : 0.02);
   const crouch = s.resting ? 0.82 : s.inShelter && threat ? 0.78 : threat && s.v < 0.07 ? 0.88 : 1;
-  velaChild.scale.set(1 + breath * 0.5, lerp(velaChild.scale.y, crouch, dt * 4) + breath, 1 + breath * 0.5);
-  velaChild.rotation.z = lerp(velaChild.rotation.z, clamp(-s.w * 2.0, -0.21, 0.21), dt * 6);  // bank into turns (≤12°)
-  velaChild.rotation.x = lerp(velaChild.rotation.x, s.dashing ? -0.12 : s.v < 0.02 ? 0.04 : 0, dt * 5);
-  const tremble = s.inShelter && threat && !reduceMotion ? 0.006 : 0;
-  velaChild.position.set((Math.random() - 0.5) * tremble, 0.03 + (s.inWater ? -0.05 : 0), (Math.random() - 0.5) * tremble);
+  if (dying) {
+    // the end, driven by the real cause: caught → struck, tips and is still; starved → weakens, breath slows, settles
+    const k = clamp((clock.elapsedTime - dying.t0) / (dying.cause === "caught" ? 0.6 : 2.6), 0, 1), ease = 1 - Math.pow(1 - k, 3);
+    if (dying.cause === "caught") { velaChild.rotation.z = lerp(0, 1.25, ease); velaChild.position.set(0.12 * ease, 0.03 - 0.05 * ease, 0); velaChild.scale.set(1, 1 - 0.25 * ease, 1); }
+    else if (dying.cause === "starved") { const slowBreath = reduceMotion ? 0 : Math.sin(t * Math.PI * 2 / 4.5) * 0.025 * (1 - k); velaChild.scale.set(1, 1 - 0.32 * ease + slowBreath, 1); velaChild.rotation.x = 0.18 * ease; velaChild.rotation.z = 0.35 * ease; velaChild.position.y = 0.03 - 0.04 * ease; }
+    if (vela && k >= 1 && dying.cause !== "survived") vela.freeze(true);
+  } else {
+    flinchT = Math.max(0, flinchT - dt);
+    const fl = flinchT > 0 ? Math.sin((0.45 - flinchT) / 0.45 * Math.PI) : 0;  // a quick involuntary squash (vent contact)
+    // measured acceleration from the simulation (u/tick per tick), smoothed
+    const accRaw = (s.v - p0.v) / TICK; body.accel = lerp(body.accel, accRaw, clamp(dt * 8, 0, 1));
+    const vn = clamp(s.v / C.v_max, 0, 1), vitality = clamp(0.35 + 0.65 * (s.stamina / 0.5), 0.35, 1) * (s.energy < 0.2 ? 0.7 : 1);
+    const tense = threat && !s.inShelter, exhausted = s.stamina < 0.2;
+    const k = exhausted ? 55 : tense ? 210 : 130, c = exhausted ? 7 : tense ? 22 : 15;  // tired bodies recover slowly; frightened ones are taut
+    // sail-pulse gait: stride rate follows real speed; amplitude fades with fatigue; no motion when still
+    if (!reduceMotion) body.phase += dt * (1.3 + 7.5 * vn) * (s.inWater ? 0.6 : 1);
+    const stride = vn > 0.03 ? Math.sin(body.phase * Math.PI * 2) : 0, amp = 0.07 * Math.pow(vn, 0.7) * vitality;
+    const squashT = crouch - 0.18 * fl - (tense ? 0.06 : 0) + amp * stride - clamp(Math.abs(body.accel) * 0.6, 0, 0.12);
+    const sq = springStep(body.squash, squashT - 1, k, c, dt) + 1;
+    const pitchT = clamp(-body.accel * 1.6, -0.28, 0.22) + (s.dashing ? -0.1 : 0) + (s.resting ? 0.05 : 0) + (exhausted ? 0.06 : 0);
+    const pitch = springStep(body.pitch, pitchT, k * 0.8, c, dt);
+    const roll = springStep(body.roll, clamp(-s.w * 2.0, -0.21, 0.21) * (0.6 + 0.4 * vn), k * 0.7, c * 0.8, dt);  // banks into turns, with lag
+    // attention: orient toward what Vela actually senses (heard predator bearing, or nearest visible seed); idle glances only when safe and still
+    let lookT = 0; const o = s.obs, SS = N_CH * C.n_rays;
+    if (o) {
+      if (o[SS + 12] > 0) lookT = clamp(Math.atan2(o[SS + 13], o[SS + 14]), -0.5, 0.5);
+      else { let best = -1, bv = 0; for (let r = 0; r < C.n_rays; r++) { const f = o[N_CH * r + 1]; if (f > bv) { bv = f; best = r; } } if (best >= 0) lookT = clamp(RAY_REL[best] * 0.35, -0.35, 0.35); }
+    }
+    if (!o || (lookT === 0 && s.v < 0.02 && !threat)) { body.glanceT -= dt; if (body.glanceT <= 0) { body.glance = (Math.random() - 0.5) * 0.5; body.glanceT = 1.5 + Math.random() * 3; } lookT = body.glance; }
+    const twist = springStep(body.twist, reduceMotion ? 0 : lookT, tense ? 160 : 60, tense ? 18 : 10, dt);
+    const lift = springStep(body.lift, amp * 0.9 * Math.max(0, stride) + (s.inWater ? -0.05 : 0), 160, 16, dt);
+    velaChild.scale.set(1 + breath * 0.5 + (1 - sq) * 0.45, sq + breath, 1 + breath * 0.5 + (1 - sq) * 0.3);
+    velaChild.rotation.set(pitch, twist, roll, "YXZ");
+    const near = world.pred.on && world.pred.pounce && !s.inShelter;
+    const tremble = !reduceMotion && ((s.inShelter && threat) || near || fl > 0) ? (fl > 0 ? 0.02 : 0.006) : 0;
+    velaChild.position.set((Math.random() - 0.5) * tremble, 0.03 + lift, (Math.random() - 0.5) * tremble);
+    // ground contact: shadow tightens as the body lifts; dust when pushing off hard or braking hard
+    velaShadow.scale.setScalar(1 - lift * 2.2);
+    if (!reduceMotion && !s.inWater && !s.inShelter && (accRaw > 0.35 || accRaw < -0.45) && Math.random() < 0.5) puff(vx, vz, accRaw > 0 ? 3 : 4, accRaw > 0 ? 0.4 : 0.55);
+  }
+  for (const d of dust) { const u = d.userData; if (u.life <= 0) continue; u.life -= dt * 1.4; d.position.x += u.vx * dt; d.position.z += u.vz * dt; d.position.y += dt * 0.12;
+    d.scale.setScalar(u.size * (1.4 - u.life * 0.6)); d.material.opacity = Math.max(0, u.life) * 0.22; if (u.life <= 0) d.visible = false; }
   velaShadow.position.set(vx, 0.012, vz); velaShadow.material.opacity = s.inWater ? 0.2 : 0.75;
-  velaGlow.position.set(vx, 0.6, vz); velaGlow.intensity = (0.25 + 0.9 * (1 - light)) * (0.5 + 0.5 * s.energy) * (s.inShelter ? 0.4 : 1);
-  velaHalo.material.opacity = (0.14 + 0.22 * (1 - light)) * (s.inShelter ? 0.4 : 1);
+  velaGlow.position.set(vx, 0.6, vz);
+  if (dying && dying.cause !== "survived") { velaGlow.intensity = lerp(velaGlow.intensity, 0, dt * 1.2); velaHalo.material.opacity = lerp(velaHalo.material.opacity, 0, dt * 1.2); }
+  else { velaGlow.intensity = (0.25 + 0.9 * (1 - light)) * (0.5 + 0.5 * s.energy) * (s.inShelter ? 0.4 : 1);
+    velaHalo.material.opacity = (0.14 + 0.22 * (1 - light)) * (s.inShelter ? 0.4 : 1); }
   // seeds
   view.seeds.forEach((sd, i) => {
     const on = s.seedOn[i];

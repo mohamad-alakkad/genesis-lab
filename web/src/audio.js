@@ -114,11 +114,20 @@ export class Soundscape {
     src.connect(f1).connect(out); src.connect(f2).connect(f2g).connect(out);
     const a = n.a || 0.025, peak = 0.9 * gain * (n.v || 1);
     out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(peak, t + a);
-    out.gain.setTargetAtTime(0, t + Math.max(a, n.d * 0.55), n.d * 0.28);
+    if (n.cut) out.gain.setValueAtTime(0, t + n.cut);  // an interrupted sound: stops mid-breath
+    else out.gain.setTargetAtTime(0, t + Math.max(a, n.d * 0.55), n.d * 0.28);
     const end = t + n.d + 0.6;
     for (const s of [o, o2, vib]) { s.start(t); s.stop(end); }
     br.start(t, rnd(0, 3)); br.stop(end);
     o.onended = () => { out.disconnect(); p.disconnect(); };
+  }
+
+  hush(seconds = 3, depth = 0.15) {  // the world goes quiet: duck everything but keep the space alive
+    if (!this.enabled) return;
+    const now = this.ctx.currentTime, g = this.world.gain;
+    g.cancelScheduledValues(now); g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(depth, now + 0.25); g.setValueAtTime(depth, now + seconds); g.linearRampToValueAtTime(1, now + seconds + 3.5);
+    this.cool.murmur = now + seconds + 4; this.cool.curious = now + seconds + 8;  // Vela's familiar voice is absent for a while
   }
 
   chime(pan = 0, bright = 1) {  // a seed's tiny glassy release
@@ -206,5 +215,12 @@ const VOICE = {
   murmur: { cool: [6, 13], gain: 0.09, notes: () => [{ f0: rnd(430, 480), f1: rnd(380, 420), d: rnd(0.45, 0.7), a: 0.15, breath: 0.85, fm1: 900, fm2: 2400 }] },
   emerge: { cool: [10, 20], gain: 0.16, notes: () => [{ f0: 720, f1: 800, d: 0.08, a: 0.02, gap: rnd(0.35, 0.6), v: 0.6 }, { f0: 760, f1: rnd(960, 1040), d: 0.13, trill: 22 }] },
   sigh: { cool: [12, 25], gain: 0.1, notes: () => [{ f0: 620, f1: 410, d: 0.55, a: 0.08, breath: 0.9, fm1: 1100 }] },
+  // vulnerability: short, involuntary, restrained; never a scream
+  hurt: { cool: [2.5, 4], gain: 0.26, notes: () => [{ f0: rnd(1250, 1380), f1: rnd(700, 780), d: 0.16, a: 0.004, trill: rnd(16, 20), breath: 0.7, fm1: 1900, fm2: 3500 },
+    ...(Math.random() < 0.5 ? [{ f0: 640, f1: 560, d: 0.18, a: 0.05, breath: 0.9, v: 0.5, fm1: 1000 }] : [])] },
+  panic: { cool: [2.2, 3.5], gain: 0.18, notes: () => Array.from({ length: 3 }, (_, i) => ({ f0: rnd(780, 860) + i * 40, f1: rnd(700, 760), d: 0.06, a: 0.006, breath: 0.95, gap: rnd(0.07, 0.1), v: 0.7 + 0.15 * i })) },
+  deathCaught: { cool: [0, 0], gain: 0.28, notes: () => [{ f0: rnd(1450, 1550), f1: 900, d: 0.4, a: 0.004, trill: 22, breath: 0.6, fm1: 2000, fm2: 3600, cut: rnd(0.11, 0.15) }] },
+  lastBreath: { cool: [0, 0], gain: 0.1, notes: () => [{ f0: 520, f1: 300, d: 0.9, a: 0.12, breath: 0.95, fm1: 850, fm2: 2200, gap: 0.5 }, { f0: 360, f1: 250, d: 0.6, a: 0.2, breath: 1.0, v: 0.45, fm1: 700 }] },
+  relief: { cool: [20, 40], gain: 0.12, notes: () => [{ f0: 560, f1: 430, d: 0.5, a: 0.1, breath: 0.9, fm1: 950, gap: rnd(0.25, 0.4) }, { f0: 820, f1: 920, d: 0.1, v: 0.6 }] },
   hungry: { cool: [14, 28], gain: 0.13, notes: () => [{ f0: 560, f1: 700, d: 0.2, gap: 0.12 }, { f0: 600, f1: 520, d: 0.22, breath: 0.5 }] },
 };

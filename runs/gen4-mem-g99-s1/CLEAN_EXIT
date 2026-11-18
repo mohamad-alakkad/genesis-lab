@@ -1,0 +1,8 @@
+{
+ "end_reason": "budget_exhausted",
+ "state": "budget_exhausted",
+ "step": 40009728,
+ "at": "2026-11-18T20:16:03Z",
+ "at_ts": 1795032963.808998,
+ "checkpoint": "gen4-mem-g99-s1/0040009728"
+}

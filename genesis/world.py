@@ -1,7 +1,9 @@
-"""GENESIS world v1 — batch-vectorized NumPy reference implementation (float64).
+"""GENESIS world v2 — batch-vectorized NumPy reference implementation (float64).
 
-All world randomness comes from a per-env mulberry32 stream (portable to JS). The JS port in
-web/ must follow exactly the same draw order; see docs/WORLD_SPEC.md.
+v2 adds momentum, stamina, rest, shelters, meadows, a day/night cycle and a predator whose
+behavior is a scripted world rule. The creature's decisions come only from the learned policy.
+All world randomness comes from a per-env mulberry32 stream (portable to JS); the JS port in
+web/src/sim/world.js follows exactly the same draw order (see docs/WORLD_SPEC.md §7).
 """
 from __future__ import annotations
 
@@ -14,8 +16,12 @@ import numpy as np
 C = json.loads((Path(__file__).with_name("world_constants.json")).read_text())
 SPEC_VERSION = C["world_spec_version"]
 N_ACTIONS = len(C["actions"])
-OBS_DIM = C["n_rays"] * 3 + 3 + N_ACTIONS
+N_CH = 6  # ray channels: solid, seed, vent, shelter, predator, water
+OBS_DIM = C["n_rays"] * N_CH + 15 + N_ACTIONS
 U32 = np.uint32
+TWO_PI = 2 * math.pi
+PATROL, HUNT, SEARCH, REST = 0, 1, 2, 3
+A_DASH, A_REST = 3, 7
 
 
 class Mulberry32:
@@ -37,39 +43,49 @@ class Mulberry32:
         return np.where(mask, r, 0.0)
 
 
+def _norm(v):
+    return np.sqrt(v[..., 0] * v[..., 0] + v[..., 1] * v[..., 1])
+
+
 class World:
     def __init__(self, n_envs: int, family: str = "train", consts: dict | None = None):
         self.c = c = dict(consts or C)
-        self.f = c["families"][family]
+        self.f = dict(c["families"][family])
         self.family = family
-        E, MO, NF, NV, R = n_envs, c["max_obstacles"], c["max_food"], c["max_vents"], c["n_rays"]
+        E, MO, MF, MV, MS, NM = n_envs, c["max_obstacles"], c["max_food"], c["max_vents"], c["max_shelters"], c["n_meadows"]
         self.E = E
         self.rng = Mulberry32(E)
-        self.pos = np.zeros((E, 2)); self.heading = np.zeros(E); self.energy = np.zeros(E)
-        self.t = np.zeros(E, dtype=np.int64); self.last_action = np.full(E, 5, dtype=np.int64)
-        self.contact = np.zeros(E, dtype=bool); self.in_hazard = np.zeros(E, dtype=bool)
-        self.obs_pos = np.zeros((E, MO, 2)); self.obs_r = np.zeros((E, MO)); self.obs_on = np.zeros((E, MO), bool)
-        self.food_pos = np.zeros((E, NF, 2))
-        self.food_on = np.zeros((E, NF), bool)
-        self.vent_pos = np.zeros((E, NV, 2)); self.vent_r = np.zeros((E, NV)); self.vent_on = np.zeros((E, NV), bool)
-        self.vent_present = np.zeros((E, NV), bool); self.vent_timer = np.zeros((E, NV), dtype=np.int64)
-        # episode statistics
-        self.ep_food = np.zeros(E, np.int64); self.ep_hazard = np.zeros(E, np.int64)
-        self.ep_dist = np.zeros(E); self.ep_contact = np.zeros(E, np.int64); self.ep_return = np.zeros(E)
-        self.events = []  # (env, tick, kind, index) — food eaten etc., for demo/parity
-        rel = np.linspace(-c["fov"] / 2, c["fov"] / 2, R)
-        self.ray_rel = rel
+        z = lambda *s: np.zeros((E, *s))
+        self.pos = z(2); self.heading = z(); self.v = z(); self.w = z(); self.energy = z(); self.stamina = z()
+        self.t = np.zeros(E, np.int64); self.t0 = np.zeros(E, np.int64); self.last_action = np.full(E, A_REST, np.int64)
+        self.contact = np.zeros(E, bool); self.in_hazard = np.zeros(E, bool); self.in_shelter = np.zeros(E, bool)
+        self.resting = np.zeros(E, bool); self.in_water = np.zeros(E, bool)
+        MP = c["max_pools"]
+        self.pool_pos = z(MP, 2); self.pool_r = z(MP); self.pool_on = np.zeros((E, MP), bool)
+        self.raining = np.zeros(E, bool); self.weather_timer = np.zeros(E, np.int64)
+        self.obs_pos = z(MO, 2); self.obs_r = z(MO); self.obs_on = np.zeros((E, MO), bool)
+        self.sh_pos = z(MS, 2); self.sh_r = z(MS); self.sh_on = np.zeros((E, MS), bool)
+        self.vent_pos = z(MV, 2); self.vent_r = z(MV); self.vent_on = np.zeros((E, MV), bool)
+        self.vent_present = np.zeros((E, MV), bool); self.vent_timer = np.zeros((E, MV), np.int64)
+        self.meadow = z(NM, 2)
+        self.food_pos = z(MF, 2); self.food_on = np.zeros((E, MF), bool); self.food_timer = np.zeros((E, MF), np.int64)
+        self.pr_on = np.zeros(E, bool); self.pr_pos = z(2); self.pr_heading = z(); self.pr_mode = np.zeros(E, np.int64)
+        self.pr_timer = np.zeros(E, np.int64); self.pr_fatigue = z(); self.pr_target = z(2); self.pr_last = z(2)
+        self.pr_speed = z(); self.pr_seen = np.zeros(E, bool); self.pr_pounce = np.zeros(E, bool)
+        self.stat_keys = ("food", "hazard", "dist", "contact", "ret", "caught", "threat", "shelter_threat", "shelter",
+                          "rest", "dash", "dash_threat", "night", "shelter_night")
+        self.ep = {k: z() for k in self.stat_keys}
+        self.events = []
+        self.ray_rel = np.linspace(-c["fov"] / 2, c["fov"] / 2, c["n_rays"])
 
-    # ----------------------------------------------------------------- sampling helpers
+    # ----------------------------------------------------------------- helpers
     def _u(self, mask):
         return self.rng.next(mask)
 
     def _sample_point(self, mask, margin, clear_fn):
-        """Candidate loop: per env draw (x, y) until clear_fn accepts, max attempts. Returns pts, ok."""
         W, H = self.c["width"], self.c["height"]
-        need = mask.copy()
-        out = np.zeros((self.E, 2)); ok = np.zeros(self.E, bool)
-        margin = np.broadcast_to(np.asarray(margin, dtype=np.float64), (self.E,))
+        need = mask.copy(); out = np.zeros((self.E, 2)); ok = np.zeros(self.E, bool)
+        margin = np.broadcast_to(np.asarray(margin, np.float64), (self.E,))
         for _ in range(self.c["sample_attempts"]):
             if not need.any():
                 break
@@ -78,81 +94,183 @@ class World:
             p = np.stack([x, y], 1)
             out[need] = p[need]
             good = need & clear_fn(p)
-            ok |= good
-            need &= ~good
+            ok |= good; need &= ~good
         return out, ok
 
-    def _dist_obstacles_ok(self, p, extra):
-        d = np.linalg.norm(self.obs_pos - p[:, None, :], axis=2)
-        ex = np.asarray(extra, np.float64)
-        ex = ex[:, None] if ex.ndim == 1 else ex
-        return np.all(~self.obs_on | (d > self.obs_r + ex), 1)
+    def _sample_polar(self, mask, center, R, clear_fn):
+        """Seeds grow around a meadow: angle draw then radius draw; out-of-bounds candidates rejected."""
+        W, H = self.c["width"], self.c["height"]
+        need = mask.copy(); out = np.zeros((self.E, 2))
+        for _ in range(self.c["sample_attempts"]):
+            if not need.any():
+                break
+            a = self._u(need) * TWO_PI
+            r = R * np.sqrt(self._u(need))
+            p = center + np.stack([r * np.cos(a), r * np.sin(a)], 1)
+            out[need] = p[need]
+            inb = (p[:, 0] >= 0.4) & (p[:, 0] <= W - 0.4) & (p[:, 1] >= 0.4) & (p[:, 1] <= H - 0.4)
+            good = need & inb & clear_fn(p)
+            need &= ~good
+        out[:, 0] = np.clip(out[:, 0], 0.4, W - 0.4); out[:, 1] = np.clip(out[:, 1], 0.4, H - 0.4)
+        return out
 
-    def _not_in_vents(self, p, extra=0.0):
-        d = np.linalg.norm(self.vent_pos - p[:, None, :], axis=2)
-        return np.all(~self.vent_on | (d > self.vent_r + extra), 1)
+    @staticmethod
+    def _extra(ex):
+        ex = np.asarray(ex, np.float64)
+        return ex[:, None] if ex.ndim == 1 else ex
+
+    def _slates_ok(self, p, extra):
+        d = _norm(self.obs_pos - p[:, None, :])
+        return np.all(~self.obs_on | (d > self.obs_r + self._extra(extra)), 1)
+
+    def _shelters_ok(self, p, extra):
+        d = _norm(self.sh_pos - p[:, None, :])
+        return np.all(~self.sh_on | (d > self.sh_r + self._extra(extra)), 1)
+
+    def _pools_ok(self, p, extra):
+        d = _norm(self.pool_pos - p[:, None, :])
+        return np.all(~self.pool_on | (d > self.pool_r + self._extra(extra)), 1)
+
+    def _in_pool(self, p):
+        return ~self._pools_ok(p, 0.0)
+
+    def _weather_duration(self, mask, rain):
+        u = self._u(mask)
+        c = self.c
+        return np.where(rain, c["rain_min"] + np.floor(u * c["rain_rand"]),
+                        c["dry_min"] + np.floor(u * c["dry_rand"])).astype(np.int64)
+
+    def _not_in_vents(self, p):
+        d = _norm(self.vent_pos - p[:, None, :])
+        return np.all(~self.vent_on | (d > self.vent_r), 1)
 
     def _vent_duration(self, mask, active):
         u = self._u(mask)
         return np.where(active, 150 + np.floor(u * 250), 100 + np.floor(u * 200)).astype(np.int64)
 
     def _place_food(self, mask, i):
-        rc, rf = self.c["creature_radius"], self.c["food_radius"]
+        rf = self.c["food_radius"]
+        m = i % self.c["n_meadows"]
         def clear(p):
-            return (self._dist_obstacles_ok(p, rf + 0.1) & self._not_in_vents(p)
-                    & (np.linalg.norm(p - self.pos, axis=1) > 1.0))
-        pts, _ = self._sample_point(mask, 0.4, clear)
+            return (self._slates_ok(p, rf + 0.1) & self._not_in_vents(p) & self._shelters_ok(p, rf)
+                    & self._pools_ok(p, rf) & (_norm(p - self.pos) > 1.0))
+        pts = self._sample_polar(mask, self.meadow[:, m], self.c["meadow_spread"], clear)
         self.food_pos[mask, i] = pts[mask]
+
+    def _new_waypoint(self, mask):
+        pr = self.c["predator_radius"]
+        pts, _ = self._sample_point(mask, 0.5, lambda p: self._slates_ok(p, pr + 0.1) & self._shelters_ok(p, pr + 0.1))
+        self.pr_target[mask] = pts[mask]
+
+    def light(self, t=None):
+        t = self.t if t is None else t
+        return 0.5 + 0.5 * np.cos(TWO_PI * (t + self.t0) / self.c["day_ticks"])
 
     # ----------------------------------------------------------------- reset
     def reset(self, mask: np.ndarray, seeds: np.ndarray):
         c, f = self.c, self.f
-        mask = np.asarray(mask, bool)
-        if not mask.any():
+        m = np.asarray(mask, bool)
+        if not m.any():
             return
-        self.rng.seed(mask, np.asarray(seeds)[mask] if np.size(seeds) == self.E else seeds)
-        m = mask
-        self.obs_on[m] = False; self.obs_r[m] = 0.0; self.obs_pos[m] = 0.0
-        self.vent_on[m] = False; self.vent_present[m] = False; self.vent_r[m] = 0.0; self.vent_pos[m] = -100.0
-        self.food_on[m] = False; self.food_pos[m] = -100.0
-        self.pos[m] = -100.0
-        n_obs = f["obs_min"] + np.floor(self._u(m) * (f["obs_max"] - f["obs_min"] + 1)).astype(np.int64)
+        self.rng.seed(m, np.asarray(seeds)[m] if np.size(seeds) == self.E else seeds)
+        rc, pr = c["creature_radius"], c["predator_radius"]
+        gap = 2 * rc + 0.05
+        for a in (self.obs_on, self.sh_on, self.vent_on, self.vent_present, self.food_on, self.pool_on):
+            a[m] = False
+        for a in (self.obs_r, self.sh_r, self.vent_r, self.pool_r):
+            a[m] = 0.0
+        for a in (self.obs_pos, self.sh_pos, self.vent_pos, self.meadow, self.food_pos, self.pool_pos):
+            a[m] = -100.0
+        self.pos[m] = -100.0; self.pr_pos[m] = -100.0; self.pr_on[m] = False
+        # 1. slates
+        n = f["obs_min"] + np.floor(self._u(m) * (f["obs_max"] - f["obs_min"] + 1)).astype(np.int64)
         for j in range(c["max_obstacles"]):
-            mj = m & (j < n_obs)
+            mj = m & (j < n)
             if not mj.any():
                 continue
             r = f["obs_rmin"] + self._u(mj) * (f["obs_rmax"] - f["obs_rmin"])
-            gap = 2 * c["creature_radius"] + 0.05  # creature can always pass between slates and walls
-            pts, _ = self._sample_point(mj, r + gap, lambda p: self._dist_obstacles_ok(p, r + gap))
+            pts, _ = self._sample_point(mj, r + gap, lambda p: self._slates_ok(p, r + gap))
             self.obs_pos[mj, j] = pts[mj]; self.obs_r[mj, j] = r[mj]; self.obs_on[mj, j] = True
+        # 2. shelters
+        n = f["sh_min"] + np.floor(self._u(m) * (f["sh_max"] - f["sh_min"] + 1)).astype(np.int64)
+        for s in range(c["max_shelters"]):
+            ms = m & (s < n)
+            if not ms.any():
+                continue
+            r = 0.9 + self._u(ms) * 0.4
+            pts, _ = self._sample_point(ms, r + 0.2, lambda p: self._slates_ok(p, r + gap) & self._shelters_ok(p, r + 1.0))
+            self.sh_pos[ms, s] = pts[ms]; self.sh_r[ms, s] = r[ms]; self.sh_on[ms, s] = True
+        # 2b. pools (shallow water: slows both creature and predator)
+        n = f["pool_min"] + np.floor(self._u(m) * (f["pool_max"] - f["pool_min"] + 1)).astype(np.int64)
+        for q in range(c["max_pools"]):
+            mq = m & (q < n)
+            if not mq.any():
+                continue
+            r = 1.2 + self._u(mq) * 0.8
+            pts, _ = self._sample_point(mq, r + 0.3, lambda p: self._slates_ok(p, r + gap) & self._shelters_ok(p, r + 0.8)
+                                        & self._pools_ok(p, r + 1.0))
+            self.pool_pos[mq, q] = pts[mq]; self.pool_r[mq, q] = r[mq]; self.pool_on[mq, q] = True
+        # 3. vents
         for v in range(c["max_vents"]):
             mv = m & (v < f["n_vents"])
             if not mv.any():
                 continue
-            r = 0.6 + self._u(mv) * 0.4
-            pts, _ = self._sample_point(mv, r, lambda p: self._dist_obstacles_ok(p, 0.0))
+            r = 0.6 + self._u(mv) * 0.3
+            pts, _ = self._sample_point(mv, r, lambda p: self._slates_ok(p, 0.0) & self._shelters_ok(p, r + 0.5)
+                                        & self._pools_ok(p, r))
             active = self._u(mv) < 0.7
             self.vent_pos[mv, v] = pts[mv]; self.vent_r[mv, v] = r[mv]; self.vent_present[mv, v] = True
             self.vent_on[mv, v] = active[mv]
             self.vent_timer[mv, v] = self._vent_duration(mv, active)[mv]
-        rc = c["creature_radius"]
+        # 4. meadows (open ground, away from shelters)
+        for k in range(c["n_meadows"]):
+            pts, _ = self._sample_point(m, 1.5, lambda p: self._shelters_ok(p, 2.2) & self._slates_ok(p, 0.0)
+                                        & self._pools_ok(p, 1.0))
+            self.meadow[m, k] = pts[m]
+        # 5. creature
         def clear_c(p):
-            dv = np.linalg.norm(self.vent_pos - p[:, None, :], axis=2)
-            return self._dist_obstacles_ok(p, rc + 0.1) & np.all(~self.vent_present | (dv > self.vent_r + rc), 1)
+            dv = _norm(self.vent_pos - p[:, None, :])
+            return self._slates_ok(p, rc + 0.1) & np.all(~self.vent_present | (dv > self.vent_r + rc), 1)
         pts, _ = self._sample_point(m, rc + 0.1, clear_c)
         self.pos[m] = pts[m]
-        self.heading[m] = self._u(m)[m] * 2 * math.pi
+        self.heading[m] = self._u(m)[m] * TWO_PI
+        # 6. predator
+        if f["predator"]:
+            pts, _ = self._sample_point(m, 0.5, lambda p: self._slates_ok(p, pr + 0.1) & self._shelters_ok(p, pr + 0.1)
+                                        & (_norm(p - self.pos) > 8.0))
+            self.pr_pos[m] = pts[m]; self.pr_on[m] = True
+            self.pr_speed[m] = (f["hunt_min"] + self._u(m) * (f["hunt_max"] - f["hunt_min"]))[m]
+            self._new_waypoint(m)
+            self.pr_mode[m] = PATROL; self.pr_timer[m] = 0; self.pr_fatigue[m] = 0.0
+            self.pr_heading[m] = 0.0; self.pr_last[m] = self.pr_pos[m]
+        self.pr_seen[m] = False; self.pr_pounce[m] = False
+        # 7. seeds
         for i in range(f["food_n"]):
             self._place_food(m, i)
             self.food_on[m, i] = True
-        self.energy[m] = c["energy_start"]; self.t[m] = 0; self.last_action[m] = 5
-        self.contact[m] = False; self.in_hazard[m] = False
-        self.ep_food[m] = 0; self.ep_hazard[m] = 0; self.ep_dist[m] = 0; self.ep_contact[m] = 0; self.ep_return[m] = 0
+        self.food_timer[m] = 0
+        # 8. time of day
+        if f["t0_fixed"] >= 0:
+            self.t0[m] = f["t0_fixed"]
+        else:
+            self.t0[m] = np.floor(self._u(m) * c["day_ticks"]).astype(np.int64)[m]
+        # 9. weather
+        rain = self._u(m) < c["rain_start_p"]
+        self.raining[m] = rain[m]
+        self.weather_timer[m] = self._weather_duration(m, rain)[m]
+        self.in_water[m] = self._in_pool(self.pos)[m]
+        self.energy[m] = c["energy_start"]; self.stamina[m] = 1.0; self.v[m] = 0.0; self.w[m] = 0.0
+        self.t[m] = 0; self.last_action[m] = A_REST
+        self.contact[m] = False; self.in_hazard[m] = False; self.resting[m] = False
+        d = _norm(self.sh_pos - self.pos[:, None, :])
+        self.in_shelter[m] = np.any(self.sh_on & (d < self.sh_r), 1)[m]
+        for k in self.stat_keys:
+            self.ep[k][m] = 0.0
 
     # ----------------------------------------------------------------- visitor / perturbation mutations
     def insert_obstacle(self, mask, r=None, at=None):
-        """Insert one slate into the first free slot (max_obstacles). Never on the creature or food."""
         c, f = self.c, self.f
+        rc, pr = c["creature_radius"], c["predator_radius"]
         mask = mask & ~np.all(self.obs_on, 1)
         if not mask.any():
             return np.zeros(self.E, bool)
@@ -160,15 +278,17 @@ class World:
             r = f["obs_rmin"] + self._u(mask) * (f["obs_rmax"] - f["obs_rmin"])
         r = np.broadcast_to(np.asarray(r, np.float64), (self.E,))
         def clear(p):
-            dfood = np.linalg.norm(self.food_pos - p[:, None, :], axis=2)
-            return (self._dist_obstacles_ok(p, r + 2 * c["creature_radius"] + 0.05)
-                    & (np.linalg.norm(p - self.pos, axis=1) > r + c["creature_radius"] + 0.5)
+            dfood = _norm(self.food_pos - p[:, None, :])
+            return (self._slates_ok(p, r + 2 * rc + 0.05) & self._shelters_ok(p, r + 0.2) & self._pools_ok(p, r)
+                    & (_norm(p - self.pos) > r + rc + 0.5) & (~self.pr_on | (_norm(p - self.pr_pos) > r + pr + 0.2))
                     & np.all(~self.food_on | (dfood > r[:, None] + c["food_radius"]), 1))
         if at is None:
-            pts, ok = self._sample_point(mask, r + 2 * c["creature_radius"] + 0.05, clear)
+            pts, ok = self._sample_point(mask, r + 2 * rc + 0.05, clear)
         else:
             pts = np.broadcast_to(np.asarray(at, np.float64), (self.E, 2)).copy()
-            ok = mask & clear(pts)
+            W, H = c["width"], c["height"]
+            inb = (pts[:, 0] >= r) & (pts[:, 1] >= r) & (pts[:, 0] <= W - r) & (pts[:, 1] <= H - r)
+            ok = mask & inb & clear(pts)
         ok &= mask
         slot = np.argmin(self.obs_on, 1)
         idx = np.nonzero(ok)[0]
@@ -176,32 +296,40 @@ class World:
         return ok
 
     def move_food(self, mask, i, xy):
-        """Visitor seed placement: same validity rule as the sampler. Returns accepted mask."""
         c = self.c
         p = np.broadcast_to(np.asarray(xy, np.float64), (self.E, 2)).copy()
-        m = 0.4
-        ok = (mask & self.food_on[:, i] & (p[:, 0] >= m) & (p[:, 1] >= m) & (p[:, 0] <= c["width"] - m)
-              & (p[:, 1] <= c["height"] - m) & self._dist_obstacles_ok(p, c["food_radius"] + 0.1)
-              & self._not_in_vents(p) & (np.linalg.norm(p - self.pos, axis=1) > 1.0))
+        mg = 0.4
+        ok = (mask & self.food_on[:, i] & (p[:, 0] >= mg) & (p[:, 1] >= mg) & (p[:, 0] <= c["width"] - mg)
+              & (p[:, 1] <= c["height"] - mg) & self._slates_ok(p, c["food_radius"] + 0.1)
+              & self._not_in_vents(p) & self._shelters_ok(p, c["food_radius"]) & self._pools_ok(p, c["food_radius"])
+              & (_norm(p - self.pos) > 1.0))
         self.food_pos[ok, i] = p[ok]
         return ok
 
     def wake_vent(self, mask, v):
-        m = mask & self.vent_present[:, v]
-        self.vent_on[m, v] = True
-        self.vent_timer[m, v] = 300
+        mm = mask & self.vent_present[:, v]
+        self.vent_on[mm, v] = True
+        self.vent_timer[mm, v] = 300
+        return mm
+
+    def alert_predator(self, mask):
+        """Something draws the predator's attention to the creature's position (it searches there)."""
+        mm = mask & self.pr_on & (self.pr_mode != REST)
+        self.pr_mode[mm] = SEARCH; self.pr_last[mm] = self.pos[mm]; self.pr_timer[mm] = self.c["predator_search_ticks"]
+        return mm
 
     def _perturb(self):
         f = self.f
-        all_ = np.ones(self.E, bool)
-        u = self._u(all_)
-        mf = u < f["p_food"]
-        mo = (~mf) & (u < f["p_food"] + f["p_obs"])
-        mv = (~mf) & (~mo) & (u < f["p_food"] + f["p_obs"] + f["p_vent"])
+        u = self._u(np.ones(self.E, bool))
+        a1 = f["p_food"]; a2 = a1 + f["p_obs"]; a3 = a2 + f["p_vent"]; a4 = a3 + f["p_alert"]
+        mf = u < a1
+        mo = (u >= a1) & (u < a2)
+        mv = (u >= a2) & (u < a3)
+        ma = (u >= a3) & (u < a4)
         if mf.any():
             k = np.minimum(np.floor(self._u(mf) * f["food_n"]).astype(np.int64), f["food_n"] - 1)
             for i in range(f["food_n"]):
-                mi = mf & (k == i)
+                mi = mf & (k == i) & self.food_on[:, i]
                 if mi.any():
                     self._place_food(mi, i)
         if mo.any():
@@ -210,54 +338,154 @@ class World:
             k = np.minimum(np.floor(self._u(mv) * f["n_vents"]).astype(np.int64), f["n_vents"] - 1)
             for v in range(f["n_vents"]):
                 self.wake_vent(mv & (k == v), v)
+        if ma.any():
+            self.alert_predator(ma)
+
+    # ----------------------------------------------------------------- predator (world rule, not learned)
+    def _los_clear(self, a, b):
+        """No slate intersects the segment a→b."""
+        ab = b - a
+        L2 = np.maximum(ab[:, 0] * ab[:, 0] + ab[:, 1] * ab[:, 1], 1e-12)
+        ac = self.obs_pos - a[:, None, :]
+        s = np.clip((ac[..., 0] * ab[:, None, 0] + ac[..., 1] * ab[:, None, 1]) / L2[:, None], 0.0, 1.0)
+        cx = a[:, None, 0] + s * ab[:, None, 0] - self.obs_pos[..., 0]
+        cy = a[:, None, 1] + s * ab[:, None, 1] - self.obs_pos[..., 1]
+        return np.all(~self.obs_on | (cx * cx + cy * cy >= self.obs_r * self.obs_r), 1)
+
+    @staticmethod
+    def _push(p, center, minD, active):
+        delta = p - center
+        d = _norm(delta)
+        hit = active & (d < minD)
+        if not hit.any():
+            return p
+        safe = np.where(d > 1e-12, d, 1.0)
+        nx = np.where(d > 1e-12, delta[:, 0] / safe, 1.0); ny = np.where(d > 1e-12, delta[:, 1] / safe, 0.0)
+        return np.where(hit[:, None], center + np.stack([nx, ny], 1) * minD[:, None], p)
+
+    def _predator_step(self):
+        c, f = self.c, self.f
+        on = self.pr_on
+        if not on.any():
+            return np.zeros(self.E, bool)
+        light = self.light()
+        detect = (c["detect_night"] + (c["detect_day"] - c["detect_night"]) * light) * f["detect_mult"]
+        detect = np.where(self.raining, detect * c["rain_detect"], detect)
+        vis = np.select([self.v < 0.02, self.v < 0.07, self.v < 0.15], [0.45, 0.65, 1.0], 1.35)
+        d = _norm(self.pos - self.pr_pos)
+        exposed = on & ~self.in_shelter & self._los_clear(self.pr_pos, self.pos)
+        seen = exposed & (d < detect * vis)
+        seen_ext = exposed & (d < detect * vis * c["lose_mult"])
+        self.pr_seen = seen
+        mode = self.pr_mode
+        to_hunt = ((mode == PATROL) | (mode == SEARCH)) & seen
+        tired = (mode == HUNT) & (self.pr_fatigue >= c["predator_fatigue_max"])
+        lost = (mode == HUNT) & ~tired & ~seen_ext
+        mode = np.where(to_hunt, HUNT, np.where(tired, REST, np.where(lost, SEARCH, mode)))
+        self.pr_timer = np.where(tired, c["predator_rest_ticks"], np.where(lost, c["predator_search_ticks"], self.pr_timer))
+        hunt = on & (mode == HUNT); search = on & (mode == SEARCH); patrol = on & (mode == PATROL); rest = on & (mode == REST)
+        self.pr_last = np.where(hunt[:, None], self.pos, self.pr_last)
+        target = np.where(hunt[:, None], self.pos, np.where(search[:, None], self.pr_last, self.pr_target))
+        pounce = hunt & (d <= c["pounce_dist"])  # stalk slowly and quietly, then accelerate
+        self.pr_pounce = pounce
+        speed = np.select([pounce, hunt, search, patrol],
+                          [self.pr_speed, c["predator_stalk"], c["predator_search"], c["predator_patrol"]], 0.0)
+        speed = np.where(self._in_pool(self.pr_pos), speed * c["predator_water_factor"], speed)
+        self.pr_fatigue = np.where(pounce, self.pr_fatigue + 1.0,
+                                   np.where(hunt, self.pr_fatigue + 0.3, np.maximum(self.pr_fatigue - 0.5, 0.0)))
+        self.pr_timer = np.where(search | rest, self.pr_timer - 1, self.pr_timer)
+        delta = target - self.pr_pos
+        dist = _norm(delta)
+        step = np.minimum(speed, dist)
+        mv = on & (dist > 1e-9) & (step > 0)
+        safe = np.where(dist > 1e-9, dist, 1.0)
+        self.pr_pos = np.where(mv[:, None], self.pr_pos + delta / safe[:, None] * step[:, None], self.pr_pos)
+        self.pr_heading = np.where(mv, np.arctan2(delta[:, 1], delta[:, 0]), self.pr_heading)
+        pr = c["predator_radius"]
+        p = self.pr_pos
+        for j in range(c["max_obstacles"]):
+            p = self._push(p, self.obs_pos[:, j], self.obs_r[:, j] + pr, on & self.obs_on[:, j])
+        for s in range(c["max_shelters"]):
+            p = self._push(p, self.sh_pos[:, s], self.sh_r[:, s] + pr, on & self.sh_on[:, s])
+        p = np.stack([np.clip(p[:, 0], pr, c["width"] - pr), np.clip(p[:, 1], pr, c["height"] - pr)], 1)
+        self.pr_pos = np.where(on[:, None], p, self.pr_pos)
+        arrived_p = patrol & (_norm(self.pr_pos - self.pr_target) < 0.3)
+        end_s = search & ((self.pr_timer <= 0) | (_norm(self.pr_pos - self.pr_last) < 0.3))
+        end_r = rest & (self.pr_timer <= 0)
+        mode = np.where(end_s | end_r, PATROL, mode)
+        self.pr_fatigue = np.where(end_r, 0.0, self.pr_fatigue)
+        self.pr_mode = mode
+        need = arrived_p | end_s | end_r
+        if need.any():
+            self._new_waypoint(need)
+        return on & ~self.in_shelter & (_norm(self.pos - self.pr_pos) < c["catch_dist"])
 
     # ----------------------------------------------------------------- step
     def step(self, action: np.ndarray):
         c = self.c
         a = np.asarray(action, np.int64)
         rc = c["creature_radius"]
-        dturn = np.select([a == 1, a == 2, a == 3, a == 4], [-c["turn_fwd"], c["turn_fwd"], -c["turn_inplace"], c["turn_inplace"]], 0.0)
-        spd = np.select([a == 0, a == 1, a == 2], [c["speed"], c["speed_turn_fwd"], c["speed_turn_fwd"]], 0.0)
-        self.heading = np.mod(self.heading + dturn, 2 * math.pi)
+        av = np.asarray(c["action_v"]); aw = np.asarray(c["action_w"])
+        can_dash = self.stamina >= c["dash_min_stamina"]
+        dashing = (a == A_DASH) & can_dash
+        tv = np.where((a == A_DASH) & ~can_dash, av[0], av[a])
+        tv = np.where(self.stamina < c["exhausted_stamina"], tv * c["exhausted_factor"], tv)
+        tv = np.where(self.in_water, tv * c["water_factor"], tv)
+        tw = aw[a]
+        self.v = self.v + (tv - self.v) * c["accel_v"]
+        self.w = self.w + (tw - self.w) * c["accel_w"]
+        self.heading = np.mod(self.heading + self.w, TWO_PI)
         old = self.pos.copy()
-        p = self.pos + spd[:, None] * np.stack([np.cos(self.heading), np.sin(self.heading)], 1)
+        p = self.pos + self.v[:, None] * np.stack([np.cos(self.heading), np.sin(self.heading)], 1)
         contact = np.zeros(self.E, bool)
         for j in range(c["max_obstacles"]):
-            delta = p - self.obs_pos[:, j]
-            d = np.linalg.norm(delta, axis=1)
-            minD = rc + self.obs_r[:, j]
-            hit = self.obs_on[:, j] & (d < minD)
-            if hit.any():
-                safe = np.where(d > 1e-12, d, 1.0)
-                nx = np.where(d > 1e-12, delta[:, 0] / safe, 1.0); ny = np.where(d > 1e-12, delta[:, 1] / safe, 0.0)
-                p = np.where(hit[:, None], self.obs_pos[:, j] + np.stack([nx, ny], 1) * minD[:, None], p)
-                contact |= hit
+            q = self._push(p, self.obs_pos[:, j], rc + self.obs_r[:, j], self.obs_on[:, j])
+            contact |= np.any(q != p, 1); p = q
         q = np.stack([np.clip(p[:, 0], rc, c["width"] - rc), np.clip(p[:, 1], rc, c["height"] - rc)], 1)
         contact |= np.any(q != p, 1)
         self.pos = q
-        moved = np.linalg.norm(q - old, axis=1)
-        self.ep_dist += moved
-        self.contact = contact; self.ep_contact += contact
+        self.contact = contact
+        self.ep["dist"] += _norm(q - old); self.ep["contact"] += contact
+        dsh = _norm(self.sh_pos - self.pos[:, None, :])
+        self.in_shelter = np.any(self.sh_on & (dsh < self.sh_r), 1)
+        self.in_water = self._in_pool(self.pos)
+        self.resting = (a == A_REST) & (self.v < 0.02)
+        self.energy -= np.where(self.resting, c["energy_decay_rest"], c["energy_decay"]) + c["move_cost_k"] * self.v * self.v
+        moving = (a <= 2) | ((a == A_DASH) & ~can_dash)
+        slow = (a >= 4) & (a <= 6)
+        dst = np.select([dashing, moving, slow, a == A_REST],
+                        [c["stamina_dash"], c["stamina_move"], c["stamina_slow"],
+                         c["stamina_rest"] + c["stamina_rest_shelter"] * self.in_shelter], 0.0)
+        self.stamina = np.clip(self.stamina + dst, 0.0, 1.0)
         reward = np.zeros(self.E)
-        self.energy -= c["energy_decay"] + c["move_cost"] * (spd > 0)
-        dv = np.linalg.norm(self.vent_pos - self.pos[:, None, :], axis=2)
+        dv = _norm(self.vent_pos - self.pos[:, None, :])
         inh = np.any(self.vent_on & (dv < self.vent_r), 1)
         self.in_hazard = inh
         self.energy -= c["hazard_drain"] * inh
         reward += c["reward_hazard_tick"] * inh
-        self.ep_hazard += inh
-        all_ = np.ones(self.E, bool)
+        self.ep["hazard"] += inh
         for i in range(c["max_food"]):
-            d = np.linalg.norm(self.food_pos[:, i] - self.pos, axis=1)
+            d = _norm(self.food_pos[:, i] - self.pos)
             eat = self.food_on[:, i] & (d < rc + c["food_radius"])
             if eat.any():
                 self.energy = np.where(eat, np.minimum(1.0, self.energy + c["food_gain"]), self.energy)
                 reward += c["reward_food"] * eat
-                self.ep_food += eat
+                self.ep["food"] += eat
                 for e in np.nonzero(eat)[0][:64]:
                     self.events.append((int(e), int(self.t[e]), "eat", i))
-                self._place_food(eat, i)
-        # vent lifecycle
+                self.food_on[eat, i] = False
+                self.food_timer[eat, i] = (c["regrow_min"] + np.floor(self._u(eat) * c["regrow_rand"])).astype(np.int64)[eat]
+        for i in range(self.f["food_n"]):  # seeds regrow where the meadow allows, after a delay
+            off = ~self.food_on[:, i]
+            if not off.any():
+                continue
+            self.food_timer[off, i] -= np.where(self.raining, 2, 1)[off]
+            grow = off & (self.food_timer[:, i] <= 0)
+            if grow.any():
+                self._place_food(grow, i)
+                self.food_on[grow, i] = True
+                for e in np.nonzero(grow)[0][:64]:
+                    self.events.append((int(e), int(self.t[e]), "grow", i))
         for v in range(c["max_vents"]):
             pv = self.vent_present[:, v]
             if not pv.any():
@@ -267,22 +495,37 @@ class World:
             if flip.any():
                 self.vent_on[flip, v] = ~self.vent_on[flip, v]
                 self.vent_timer[flip, v] = self._vent_duration(flip, self.vent_on[:, v])[flip]
+        self.weather_timer -= 1
+        wflip = self.weather_timer <= 0
+        if wflip.any():
+            self.raining[wflip] = ~self.raining[wflip]
+            self.weather_timer[wflip] = self._weather_duration(wflip, self.raining)[wflip]
+        caught = self._predator_step()
+        threat = self.pr_on & ((self.pr_mode == HUNT) | (self.pr_mode == SEARCH)) & (_norm(self.pos - self.pr_pos) < 6.0)
+        night = self.light() < 0.3
+        self.ep["threat"] += threat; self.ep["shelter_threat"] += threat & self.in_shelter
+        self.ep["shelter"] += self.in_shelter; self.ep["rest"] += self.resting
+        self.ep["dash"] += dashing; self.ep["dash_threat"] += dashing & threat
+        self.ep["night"] += night; self.ep["shelter_night"] += night & self.in_shelter
         self._perturb()
         self.t += 1
         self.last_action = a
-        dead = self.energy <= 0
+        starve = self.energy <= 0
         self.energy = np.maximum(self.energy, 0.0)
-        reward += c["reward_death"] * dead
+        dead = starve | caught
+        reward += np.where(caught, c["reward_caught"], np.where(starve, c["reward_starve"], 0.0))
+        self.ep["caught"] += caught
         trunc = (~dead) & (self.t >= c["max_ticks"])
-        self.ep_return += reward
+        self.ep["ret"] += reward
         return reward, dead, trunc
 
     # ----------------------------------------------------------------- observation
     def observe(self) -> np.ndarray:
         c = self.c
         R, rng_ = c["n_rays"], c["ray_range"]
+        light = self.light()
         ang = self.heading[:, None] + self.ray_rel[None, :]
-        dx, dy = np.cos(ang), np.sin(ang)  # (E,R)
+        dx, dy = np.cos(ang), np.sin(ang)
         px, py = self.pos[:, 0:1], self.pos[:, 1:2]
         with np.errstate(divide="ignore", invalid="ignore"):
             tx = np.where(dx > 1e-12, (c["width"] - px) / dx, np.where(dx < -1e-12, (0.0 - px) / dx, np.inf))
@@ -290,9 +533,9 @@ class World:
         t_wall = np.minimum(tx, ty)
 
         def circles(cpos, cr, con):
-            ox = cpos[:, None, :, 0] - px[:, :, None]  # (E,1,C)
+            ox = cpos[:, None, :, 0] - px[:, :, None]
             oy = cpos[:, None, :, 1] - py[:, :, None]
-            proj = ox * dx[:, :, None] + oy * dy[:, :, None]  # (E,R,C)
+            proj = ox * dx[:, :, None] + oy * dy[:, :, None]
             d2 = ox * ox + oy * oy
             perp2 = d2 - proj * proj
             r2 = (cr * cr)[:, None, :]
@@ -300,18 +543,32 @@ class World:
             thc = np.sqrt(np.maximum(r2 - perp2, 0.0))
             t0 = proj - thc; t1 = proj + thc
             t = np.where(t0 >= 0, t0, np.where(t1 >= 0, 0.0, np.inf))
-            t = np.where(hit, t, np.inf)
-            return t.min(axis=2)
+            return np.where(hit, t, np.inf).min(axis=2)
 
         t_solid = np.minimum(t_wall, circles(self.obs_pos, self.obs_r, self.obs_on))
-        fr = np.full(self.food_pos.shape[:2], c["food_radius"])
-        t_food = circles(self.food_pos, fr, self.food_on)
+        t_food = circles(self.food_pos, np.full(self.food_pos.shape[:2], c["food_radius"]), self.food_on)
         t_haz = circles(self.vent_pos, self.vent_r, self.vent_on)
+        t_sh = circles(self.sh_pos, self.sh_r, self.sh_on)
+        t_wat = circles(self.pool_pos, self.pool_r, self.pool_on)
+        t_pr = circles(self.pr_pos[:, None, :], np.full((self.E, 1), c["predator_radius"]), self.pr_on[:, None])
+        sight = c["pred_sight_night"] + (c["pred_sight_day"] - c["pred_sight_night"]) * light
+        t_pr = np.where(t_pr <= sight[:, None], t_pr, np.inf)
         prox = lambda t: 1.0 - np.minimum(t, rng_) / rng_
-        rays = np.stack([prox(t_solid), prox(t_food), prox(t_haz)], 2).reshape(self.E, R * 3)
+        rays = np.stack([prox(t_solid), prox(t_food), prox(t_haz), prox(t_sh), prox(t_pr), prox(t_wat)], 2).reshape(self.E, R * N_CH)
+        hr = np.where(self.pr_mode == HUNT, np.where(self.pr_pounce, c["hear_hunt"], c["hear_stalk"]), c["hear_calm"])
+        hr = np.where(self.raining, hr * c["rain_hear"], hr)
+        rel = self.pr_pos - self.pos
+        dpr = _norm(rel)
+        heard = self.pr_on & (self.pr_mode != REST) & (dpr < hr)
+        hp = np.where(heard, 1.0 - dpr / hr, 0.0)
+        bearing = np.arctan2(rel[:, 1], rel[:, 0]) - self.heading
+        phase = TWO_PI * (self.t + self.t0) / c["day_ticks"]
         onehot = np.zeros((self.E, N_ACTIONS)); onehot[np.arange(self.E), self.last_action] = 1.0
-        return np.concatenate([rays, self.energy[:, None], self.in_hazard[:, None].astype(np.float64),
-                               self.contact[:, None].astype(np.float64), onehot], 1)
+        selfv = np.stack([self.energy, self.stamina, self.v / c["v_max"], self.w / c["w_max"], self.in_shelter * 1.0,
+                          self.in_hazard * 1.0, self.in_water * 1.0, self.contact * 1.0, light, self.raining * 1.0,
+                          np.sin(phase), np.cos(phase),
+                          hp, np.where(heard, np.sin(bearing), 0.0), np.where(heard, np.cos(bearing), 0.0)], 1)
+        return np.concatenate([rays, selfv, onehot], 1)
 
 
 class VecEnv:
@@ -338,8 +595,8 @@ class VecEnv:
         info = None
         if done.any():
             w = self.w
-            info = {"food": w.ep_food[done].copy(), "ticks": w.t[done].copy(), "ret": w.ep_return[done].copy(),
-                    "dead": dead[done].copy(), "hazard": w.ep_hazard[done].copy()}
+            info = {"food": w.ep["food"][done].copy(), "ticks": w.t[done].copy(), "ret": w.ep["ret"][done].copy(),
+                    "dead": dead[done].copy(), "caught": w.ep["caught"][done].copy()}
             w.reset(done, self._seeds())
         self.w.events.clear()
         return self.obs(), r, dead, trunc, info

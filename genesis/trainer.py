@@ -18,13 +18,13 @@ from genesis.world import C, N_ACTIONS, OBS_DIM, SPEC_VERSION, VecEnv
 
 RUNS = ckpt.ROOT / "runs"
 DEFAULT_CONFIG = {
-    "n_envs": 128, "n_steps": 128, "epochs": 4, "minibatch": 2048, "lr": 3e-4, "gamma": 0.99, "lam": 0.95,
-    "clip": 0.2, "ent_coef": 0.01, "vf_coef": 0.5, "max_grad_norm": 0.5, "hidden": [64, 64],
-    "total_steps": 30_000_000, "segment_minutes": 60, "ckpt_minutes": 10, "first_ckpt_s": 45,
-    "publish_minutes": 30, "heartbeat_s": 30, "eval_every_steps": 1_000_000, "eval_episodes": 100,
-    "target_survival": 0.85, "plateau_evals": 8, "plateau_eps": 0.2, "seed": 1,
+    "n_envs": 256, "n_steps": 128, "epochs": 4, "minibatch": 2048, "lr": 3e-4, "gamma": 0.99, "lam": 0.95,
+    "clip": 0.2, "ent_coef": 0.01, "vf_coef": 0.5, "max_grad_norm": 0.5, "hidden": [128, 128],
+    "total_steps": 60_000_000, "segment_minutes": 60, "ckpt_minutes": 10, "first_ckpt_s": 45,
+    "publish_minutes": 30, "heartbeat_s": 30, "eval_every_steps": 2_000_000, "eval_episodes": 100,
+    "target_survival": 0.9, "plateau_evals": 10, "plateau_eps": 15.0, "seed": 1,
     "rss_soft_mb": 1400, "rss_hard_mb": 1600, "host_min_avail_frac": 0.10,
-    "milestone_steps": {"early": 1_000_000},
+    "milestone_steps": {"early": 2_000_000},
 }
 
 
@@ -143,14 +143,15 @@ class Trainer:
         from genesis.evalonly.suite import evaluate_policy  # eval module stays out of export paths
         p, norm = self.params, self.norm
         res = evaluate_policy(lambda o: ppo.policy_logits(p, norm(o)).argmax(1), ("standard",), self.cfg["eval_episodes"])["standard"]
-        s = {"suite": "heldout-standard", "step": self.state["global_step"], "food_mean": res["food"]["mean"],
-             "food_ci95": res["food"]["ci95"], "survived": res["survived"]["mean"], "ticks": res["ticks"]["mean"],
+        s = {"suite": "heldout-standard", "step": self.state["global_step"], "score": res["ticks"]["mean"],
+             "score_ci95": res["ticks"]["ci95"], "food_mean": res["food"]["mean"], "survived": res["survived"]["mean"],
+             "caught": res["caught"]["mean"], "shelter_when_threat": res["shelter_when_threat"]["mean"],
              "hazard": res["hazard"]["mean"], "episodes": self.cfg["eval_episodes"]}
         _append(self.dir / "eval_history.jsonl", s)
         self.state["eval_latest"] = s; self.state["evals"] += 1
         best = self.state.get("best")
-        is_best = best is None or s["food_mean"] > best["food_mean"] + 1e-9
-        if best is None or s["food_mean"] > best["food_mean"] + self.cfg["plateau_eps"]:
+        is_best = best is None or s["score"] > best["score"] + 1e-9
+        if best is None or s["score"] > best["score"] + self.cfg["plateau_eps"]:
             self.state["since_best"] = 0
         else:
             self.state["since_best"] += 1
@@ -194,8 +195,12 @@ class Trainer:
             first_ckpt_due = seg_start + cfg["first_ckpt_s"]
             first_done = False
             final_state, end_reason = self._segment(seg_idx, seg_start, first_ckpt_due, until)
-            m = self.checkpoint(milestones=["final"] if final_state in ("completed", "plateaued", "budget_exhausted") else [])
-            self.publish()
+            terminal = final_state in ("completed", "plateaued", "budget_exhausted", "failed")
+            if terminal:
+                self.state["terminal"] = {"state": final_state, "reason": end_reason}
+            m = self.checkpoint(milestones=["final"] if terminal and final_state != "failed" else [])
+            if not terminal:
+                self.publish()
             _append(self.dir / "history.jsonl", {"segment": seg_idx, "event": "end", "end": ckpt.now_iso(),
                                                   "end_reason": end_reason, "end_confirmed": True,
                                                   "steps_start": steps_start, "steps_end": self.state["global_step"],
@@ -205,10 +210,10 @@ class Trainer:
                 break
         if final_state == "paused" and end_reason == "segment_done":
             final_state = "paused"
-        self.publish()  # make sure heartbeat/history snapshot is remote
-        _jdump(clean, {"end_reason": end_reason, "step": self.state["global_step"], "at": ckpt.now_iso(),
-                       "checkpoint": self.last_ckpt_id})
+        _jdump(clean, {"end_reason": end_reason, "state": final_state, "step": self.state["global_step"],
+                       "at": ckpt.now_iso(), "at_ts": time.time(), "checkpoint": self.last_ckpt_id})
         self.heartbeat(self.state["segments"], state=final_state, end_reason=end_reason)
+        self.publish()  # remote snapshot includes CLEAN_EXIT, heartbeat and history
         return final_state, end_reason
 
     def _segment(self, seg_idx, seg_start, first_ckpt_due, until):

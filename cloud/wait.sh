@@ -11,7 +11,7 @@ done
 for f in runs/cycle-s*.log; do echo "$f: $(grep -E 'EXIT|trainer ended|previous end' $f | tail -2 | tr '\n' ' ')"; done
 python3 - <<'PY'
 import json, pathlib
-for p in sorted(pathlib.Path("runs").glob("gen1-s*/heartbeat.json")):
+for p in sorted(pathlib.Path("runs").glob("gen*-s*/heartbeat.json")):
     h = json.loads(p.read_text()); print(p.parent.name, "step", h["global_step"], "sps", h["steps_per_sec"], "rss", h["rss_mb"], "pub", (h.get("last_remote_publish") or {}).get("checkpoint_id"))
 PY
 [ $alive -eq 0 ] && echo ALL_DONE || echo STILL_RUNNING

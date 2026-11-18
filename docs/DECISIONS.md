@@ -12,3 +12,10 @@
 - 2026-11-18 Resource guard (this server): Windows Job Object 1800 MB, BELOW_NORMAL priority, affinity 2 of 4 cores; the over-allocation test was stopped at 1.7 GB. Watchdog at 1.4/1.6 GB.
 - 2026-11-18 Compute (user directive, overrides earlier choices): training runs in **Claude Code Cloud** sandboxes in short, published cycles. No GitHub Actions compute. No training on the Windows server without explicit authorization (only one 3-minute pipeline validation ran there, before the directive).
 - 2026-11-18 Design pack: kept local-only (`design/`, git-ignored) until the user approves publishing the assets in the public repo.
+- 2026-11-18 v1 lineage frozen as the reproducible baseline (tag `v1-baseline`; cloud runs gen1-s1/s2 on `genesis-store-s1/s2`).
+- 2026-11-18 World v2.0.0 (user's living-world vision): momentum, stamina, rest, shelters, 3 meadows with regrowth delay, pools, rain, day/night, a scripted predator (patrol/stalk/pounce/search/rest). No behavior rewards; hiding, resting and fleeing must emerge from survival + food reward. New lineage gen2 (spaces changed, no fork).
+- 2026-11-18 Balance fix found by baselines: instant seed respawn made hunger irrelevant (forager ate 87/episode) → regrowth delay 120–249 ticks.
+- 2026-11-18 v2 baselines: random, forager (ignores the predator), survivor (scripted flee-to-shelter + rest). Verdict = survival beats random AND survivor with disjoint CIs per family.
+- 2026-11-18 v2 network 2×128 tanh, 256 envs, eval every 2M steps, score = held-out mean survival ticks; plateau = no +15 ticks over 10 evals; target = survival rate ≥ 0.9 twice.
+- 2026-11-18 Cloud cycles: hourly routine, 45-min `cloud/cycle.sh` with 4 seeds (one BLAS thread each), publish every 8 min; resume refuses (exit 7) if another trainer's heartbeat is < 15 min old without a clean exit; finished runs are a no-op.
+- 2026-11-18 Presentation (later, W9): procedural Web Audio voice + ambience driven only by sim state; behavioral "states" shown are derived labels, not claims of feeling.

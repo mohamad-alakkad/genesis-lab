@@ -165,6 +165,15 @@ def cmd_resume(a):
     set_current(run_id)
     if d is not None:
         st = json.loads((d / "state.json").read_text())
+        if st.get("terminal") and not a.new:
+            print(f"run {run_id} already finished: {st['terminal']} at step {man['global_step']}; nothing to resume")
+            return 0
+        hbr = run_dir / "heartbeat.remote.json"
+        if hbr.exists() and not (run_dir / "heartbeat.json").exists() and not (run_dir / "CLEAN_EXIT").exists():
+            age = time.time() - json.loads(hbr.read_text()).get("updated_ts", 0)
+            if age < 900:
+                print(f"another trainer published a heartbeat {age:.0f} s ago without a clean exit; refusing to fork the run")
+                return 7
         from genesis import ppo
         from genesis.world import OBS_DIM, N_ACTIONS
         want = ckpt.arch_signature(ppo.init_params(OBS_DIM, N_ACTIONS, cfg["hidden"], 0))
@@ -235,14 +244,14 @@ def cmd_status(a):
             lines.append(f"publish error: {st['publish_error'][:160]}")
         el, eb = st.get("eval_latest"), st.get("eval_best")
         if el:
-            lines.append(f"held-out (standard, argmax): latest food {el['food_mean']} {el['food_ci95']} survived {el['survived']} @ {el['step']:,}")
+            lines.append(f"held-out (standard, argmax): survival {el['score']} ticks {el['score_ci95']} · food {el['food_mean']} · caught {el['caught']} · sheltered-under-threat {el['shelter_when_threat']} @ {el['step']:,}")
         if eb:
-            lines.append(f"best: food {eb['food_mean']} survived {eb['survived']} ({eb['checkpoint_id']})")
+            lines.append(f"best: survival {eb['score']} ticks, caught {eb['caught']} ({eb['checkpoint_id']})")
         bp = ROOT / "docs" / "reports" / "baselines.json"
         if bp.exists():
             b = json.loads(bp.read_text())
-            lines.append("baselines (standard): random food {} · heuristic food {}".format(
-                b["random"]["standard"]["food"]["mean"], b["heuristic"]["standard"]["food"]["mean"]))
+            lines.append("baselines (standard survival ticks): " + " · ".join(
+                f"{k} {v['standard']['ticks']['mean']}" for k, v in b.items() if isinstance(v, dict) and "standard" in v))
         tr = st.get("train_recent") or {}
         lines.append(f"training episodes (recent, stochastic): food {tr.get('food')} ticks {tr.get('ticks')}")
         i = st["interruptions"]
@@ -308,7 +317,7 @@ def cmd_diagnose(a):
     eh = run_dir / "eval_history.jsonl"
     if eh.exists():
         rows = [json.loads(l) for l in eh.read_text().splitlines() if l.strip()]
-        if len(rows) >= 6 and max(r["food_mean"] for r in rows[-5:]) <= rows[-6]["food_mean"] + 0.1 and rows[-1]["survived"] < 0.5:
+        if len(rows) >= 6 and max(r["score"] for r in rows[-5:]) <= rows[-6]["score"] + 5 and rows[-1]["survived"] < 0.5:
             findings.append("flat held-out score over the last 5 evals")
     print("\n".join(findings) if findings else "no findings")
     return 11 if crit else (10 if findings else 0)
@@ -358,7 +367,7 @@ def main(argv=None):
     s = sub.add_parser("publish"); s.add_argument("--run")
     sub.add_parser("fetch")
     s = sub.add_parser("evaluate"); s.add_argument("--run"); s.add_argument("--ckpt"); s.add_argument("--episodes", type=int, default=100)
-    s.add_argument("--families", default="standard,unseen_layout,perturbed,harder")
+    s.add_argument("--families", default="standard,unseen_layout,night,relentless,one_shelter,perturbed,no_predator")
     s = sub.add_parser("export"); s.add_argument("--run"); s.add_argument("--ckpt"); s.add_argument("--milestones", action="store_true")
     a = ap.parse_args(argv)
     return {"train": cmd_train, "resume": cmd_resume, "stop": cmd_stop, "status": cmd_status, "diagnose": cmd_diagnose,

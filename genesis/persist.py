@@ -76,7 +76,7 @@ def publish(run_dir: Path, run_id: str, retries=3, log=print):
     sel = keep[-3:] + [(c, mc) for c, mc in keep[:-3] if mc.get("milestones")]
     for c, _ in sel:
         shutil.copytree(c, dst_run / "ckpt" / c.name)
-    for n in ("history.jsonl", "heartbeat.json", "eval_history.jsonl", "config.json"):
+    for n in ("history.jsonl", "heartbeat.json", "eval_history.jsonl", "config.json", "CLEAN_EXIT"):
         if (run_dir / n).exists():
             shutil.copy2(run_dir / n, dst_run / n)
     (dst_run / "LAST_GOOD").write_text(lg + "\n")
@@ -138,8 +138,10 @@ def fetch(run_dir_parent: Path, log=print):
         for n in ("history.jsonl", "eval_history.jsonl", "config.json"):
             if (src / n).exists() and not (dst / n).exists():
                 shutil.copy2(src / n, dst / n)
-        if not (dst / "heartbeat.json").exists() and (src / "heartbeat.json").exists():
+        if (src / "heartbeat.json").exists():
             shutil.copy2(src / "heartbeat.json", dst / "heartbeat.remote.json")
+        if (src / "CLEAN_EXIT").exists() and not (dst / "heartbeat.json").exists():
+            shutil.copy2(src / "CLEAN_EXIT", dst / "CLEAN_EXIT")
         if not (dst / "LAST_GOOD").exists():
             ckpt.atomic_write(dst / "LAST_GOOD", (latest["checkpoint_id"] + "\n").encode())
         return run_id, latest["checkpoint_id"]

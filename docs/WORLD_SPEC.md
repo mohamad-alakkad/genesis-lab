@@ -1,69 +1,63 @@
 # GENESIS world specification
 
-**Version:** 1.0.0 · **Status:** frozen for training lineage 1 · **Changelog:** 1.0.0 initial (2026-11-18)
+**Version:** 2.0.0 · **Status:** frozen for lineage gen2 · **Changelog:** 1.0.0 seeds/vents/slates, tag `v1-baseline` · 2.0.0 living world (momentum, stamina, rest, shelters, meadows with regrowth, pools, rain, day/night, stalking predator)
 
-Numbers live in `genesis/world_constants.json` (shared by Python and the JS port; never hand-copy).
-Reference implementation: `genesis/world.py` (vectorized NumPy, float64). Coordinates: x right, y **down**, origin top-left.
+All numbers live in `genesis/world_constants.json`, shared byte-for-byte with the JS port. Reference implementation: `genesis/world.py`. Coordinates: x right, y **down**.
 
-## 1. Units and time
-- Arena 16 × 10 u, walls on all sides. Creature radius 0.3 u.
-- Tick: 0.1 s world time (10 Hz); the policy decides once per tick. Episode cap: 1000 ticks (truncation, not death).
+## 1. Units, time, places
+- Arena 24 × 16 u (the observer camera follows Vela), walls on all sides. Tick 0.1 s; one decision per tick. Episode cap 1500 ticks (2.5 days).
+- **Day/night:** day = 600 ticks; light = ½ + ½·cos(2π(t + t0)/600) (1 = noon). t0 is random per episode (fixed in the `night` family).
+- **Rain:** per episode, rain starts with p = 0.3. Dry spells last 400–899 ticks, rain 150–399, then the state toggles. Rain: the predator's detection ×0.7, the creature's hearing ×0.6, seeds regrow twice as fast.
 
 ## 2. Entities
-- **Creature (Vela):** kinematic, no inertia. Heading θ, direction (cos θ, sin θ).
-- **Seeds (food):** `food_n` active (5; 3 in `harder`), radius 0.25, +0.3 energy (capped at 1.0). Eaten when center distance < 0.55. Respawn immediately by the sampler: clear of slates by r+0.35, outside active vents, > 1.0 u from the creature.
-- **Vents (hazards):** `n_vents` circles (radius 0.6–1.0). Each has `present`, `active` and a countdown timer: active lasts 150–399 ticks, dormant 100–299, then toggles. Start active with p = 0.7. Inside an active vent: extra drain 0.025/tick and reward −0.05/tick. "Wake" (visitor or perturbation) sets active with timer 300.
-- **Slates (obstacles):** circles, up to 10 slots. Count and radius per family. At layout time each slate keeps ≥ 0.65 u (creature diameter + 0.05) from walls and from other slates, so the creature can always pass.
+- **Vela (creature):** radius 0.3; speed v and turn rate ω with momentum (§3); energy (hunger) and stamina (exertion), both in [0, 1].
+- **Seeds (food):** `food_n` slots, each bound to meadow i mod 3. Placed within 2.2 u of the meadow center (polar draw), never in slates, shelters, pools or active vents, and > 1 u from Vela. Eating: +0.25 energy (cap 1), reward +1. The slot then **regrows** after 120–249 ticks (twice as fast in rain) at a new point of the same meadow.
+- **Meadows (3):** open ground ≥ 2.2 u beyond shelter edges and ≥ 1 u from pools, so food and safety are separated.
+- **Shelters (thickets, 2–4):** circles r 0.9–1.3. Inside a shelter, Vela cannot be seen or caught. The predator cannot enter (it is pushed out).
+- **Pools (1–2):** circles r 1.2–2.0. Inside, Vela's target speed ×0.55 and the predator's speed ×0.6.
+- **Vents (2):** circles r 0.6–0.9 with active/dormant cycles (active 150–399, dormant 100–299). In an active vent: energy −0.02/tick and reward −0.05/tick.
+- **Slates (4–8, up to 12):** circles; they block movement and the predator's line of sight. Layout gap ≥ 0.65 u.
+- **The predator (Shade, a scripted world rule):** radius 0.35. Modes: **patrol** (0.065 u/tick to random waypoints) → **hunt** when it sees Vela → **search** at Vela's last seen position (0.09, 50 ticks) → patrol; **rest** for 60 ticks after a long hunt (fatigue ≥ 120). During a hunt it **stalks** at 0.05 (quiet) until within 2.8 u, then **pounces** at its hunt speed (train U[0.10, 0.145]; standard U[0.125, 0.145]; relentless 0.16). It sees Vela if Vela is not in a shelter, line of sight is clear of slates, and distance < detect × visibility, where detect = lerp(4.6 at night, 2.2 at noon) × family multiplier × (0.7 if raining) and visibility by Vela's speed: <0.02 → 0.45, <0.07 → 0.65, <0.15 → 1.0, else 1.35. It loses Vela beyond 1.4× that range. Catch: center distance < 0.6 with Vela outside a shelter → episode ends.
 
 ## 3. Dynamics (fixed order per tick)
-1. Heading += Δθ(action), wrapped to [0, 2π). 2. Position += speed(action) · direction.
-3. Collisions: slates in slot order 0..9 (push out along the center normal to distance r_c + r_slate; zero-distance → +x), then clamp to [r_c, W−r_c] × [r_c, H−r_c]. `contact` = any push or clamp. Max step 0.15 < every collider radius → no tunnelling.
-4. Energy −= 0.0035 + 0.0015·[speed > 0]. 5. Active vent contact: energy −= 0.025, reward −0.05.
-6. Eating in seed index order 0..4: energy = min(1, e + 0.3), reward +1, respawn (sampler).
-7. Vent timers −1, toggle at ≤ 0 (new duration drawn). 8. Random perturbation (§8). 9. t += 1.
-10. Death if energy ≤ 0 (energy clamped to 0, reward −1). Truncation if t ≥ 1000.
+1. Action target (v*, ω*) from §4. Dash needs stamina ≥ 0.1, otherwise it acts as cruise. Stamina < 0.2 → v* × 0.6. In a pool → v* × 0.55.
+2. v += (v* − v)·0.3; ω += (ω* − ω)·0.4; heading = (heading + ω) mod 2π; position += v·(cos, sin).
+3. Collisions: slates in slot order (push out along the normal), then wall clamp. `contact` flag.
+4. in_shelter, in_water. Resting = action rest ∧ v < 0.02.
+5. Energy −= (resting ? 0.0011 : 0.0022) + 0.05·v². Stamina += dash −0.014 · cruise/veer −0.0005 · turn/creep +0.003 · rest +0.008 (+0.008 in a shelter), clipped to [0, 1].
+6. Active vent contact. 7. Eating in slot order. 8. Seed regrowth in slot order. 9. Vent timers. 10. Weather timer.
+11. Predator update (mode transitions, then movement, push-out from slates and shelters, wall clamp, then waypoint draws). Catch test.
+12. Random perturbation (§8). 13. t += 1. 14. Death: starvation (energy ≤ 0, reward −1) or caught (reward −2). Truncation at 1500.
 
-## 4. Actions
-| id | name | Δθ (rad) | speed (u/tick) |
+## 4. Actions (discrete, 8)
+| id | name | v* (u/tick) | ω* (rad/tick) |
 |---|---|---|---|
-| 0 | forward | 0 | 0.15 |
-| 1 | forward_left | −0.15 | 0.12 |
-| 2 | forward_right | +0.15 | 0.12 |
-| 3 | turn_left | −0.3 | 0 |
-| 4 | turn_right | +0.3 | 0 |
-| 5 | stay | 0 | 0 |
-"Left" is −θ, which is counter-clockwise on screen because y points down.
+| 0 | cruise | 0.12 | 0 |
+| 1 | veer_left | 0.10 | −0.12 |
+| 2 | veer_right | 0.10 | +0.12 |
+| 3 | dash | 0.22 | 0 |
+| 4 | turn_left | 0.03 | −0.25 |
+| 5 | turn_right | 0.03 | +0.25 |
+| 6 | creep | 0.05 | 0 |
+| 7 | rest | 0 | 0 |
 
-## 5. Observations (42 floats, all in [0, 1])
-| index | meaning |
-|---|---|
-| 3k+0, 3k+1, 3k+2 for ray k = 0..10 | proximity to the nearest solid (wall or slate), seed, active vent along ray k |
-| 33 | energy |
-| 34 | in active vent (0/1) |
-| 35 | contact this tick (0/1) |
-| 36–41 | one-hot of the last action (reset: stay) |
-- Rays: 11, evenly spaced from θ−120° to θ+120° (k = 0 is the leftmost), range 6 u, cast from the creature center.
-- Proximity = 1 − min(t, 6)/6 (0 = nothing in range). Ray–circle: the nearest non-negative intersection; inside a circle → t = 0. Walls: the minimum positive axis distance.
-- Policy input normalization: running mean/var frozen at checkpoint, clip ±10, ε = 1e-8.
+## 5. Observations (89 floats in [−1, 1])
+- Rays: 11 over ±120° (k = 0 leftmost), range 6. Channels per ray (index 6k + c): 0 solid (wall/slate), 1 seed, 2 active vent, 3 shelter, 4 predator (only if within sight = lerp(2.5 at night, 6 at noon)), 5 pool. Value = 1 − min(t, 6)/6.
+- 66 energy · 67 stamina · 68 v/0.22 · 69 ω/0.25 · 70 in_shelter · 71 in_vent · 72 in_water · 73 contact · 74 light · 75 raining · 76 sin(day phase) · 77 cos(day phase)
+- 78–80 hearing: predator within hearing radius (pounce 6, stalk 1.5, patrol/search 3; ×0.6 in rain; silent when resting) → proximity 1 − d/r, sin and cos of the bearing relative to heading (0 when not heard)
+- 81–88 one-hot of the last action (reset: rest)
 
 ## 6. Reward
-| event | reward |
-|---|---|
-| seed eaten | +1 |
-| tick inside an active vent | −0.05 |
-| starvation (energy ≤ 0) | −1 |
-An idle living creature outside vents gets 0 per step, so nothing teaches early death.
+seed +1 · tick in an active vent −0.05 · starvation −1 · caught −2. Nothing else: no reward for hiding, resting or fleeing. Those must be learned as means to survive and eat.
 
 ## 7. Randomness
-- PRNG: **mulberry32**, one uint32 stream per env, state = episode seed. `next`: s += 0x6D2B79F5; t = (s ^ s>>15)·(s|1); t = (t + ((t ^ t>>7)·(t|61))) ^ t; return (t ^ t>>14) / 2^32 (uint32 arithmetic).
-- Draw order at reset: n_slates; per slate (radius, then sampler); per vent (radius, sampler, active flag, duration); creature (sampler, heading); per seed (sampler).
-- Sampler: up to 32 attempts, each draws x then y in [m, W−m] × [m, H−m]; the first clear point wins, otherwise the last candidate (slate insertion is skipped instead).
-- Training seeds: [0, 2^31). Held-out evaluation: 3 000 000 000 + family·100 000 + i. Demo seeds: 4 000 000 000+.
+- mulberry32 per env, state = episode seed (algorithm in v1.0.0, unchanged).
+- Reset draw order: n_slates; per slate (r, sampler) → n_shelters; per shelter (r, sampler) → n_pools; per pool (r, sampler) → per vent (r, sampler, active, duration) → per meadow (sampler) → creature (sampler, heading) → predator (sampler, hunt speed, waypoint sampler) → per seed (polar sampler: angle, radius per attempt) → t0 (unless fixed) → rain flag, weather duration.
+- Sampler: ≤ 32 attempts (x then y); the first clear candidate wins, otherwise the last one (slate insertion is skipped instead).
+- Seeds: training [0, 2^31) · held-out 3 000 000 000 + family·100 000 + i · demo 4 000 000 000+.
 
-## 8. Perturbations (per tick, one draw u)
-u < p_food → relocate a random seed (index draw, sampler) · else u < p_food+p_obs → insert a slate (radius draw, sampler; not within r+r_c+0.5 of the creature, not on seeds; skipped when 10 slots are used) · else u < p_food+p_obs+p_vent → wake a random vent.
-Family rates: see `world_constants.json` (`perturbed` ≈ 7× the training rates). The demo's visitor actions map to the same three mutations, with the same clearance rules.
+## 8. Perturbations and visitor actions (same rules)
+One draw u per tick: u < p_food → relocate a random live seed · then p_obs → insert a slate (clear of Vela, the predator, seeds, shelters and pools) · then p_vent → wake a random vent · then p_alert → alert the predator (it searches Vela's current position). Visitor actions map to: move seed, place slate, wake vent, make a sound (alert).
 
 ## 9. Numerics and parity
-World math float64 in both implementations; the policy runs in float64 in Python and in JS. Tolerances: observations 1e-6, logits 1e-4.
-Avoided: hash-ordered iteration; NumPy RNG for anything in the world; `Math.random`.
+float64 world and policy in both implementations; tolerances: observations 1e-6, logits 1e-4. The predator uses atan2 for heading only (presentation); its movement uses normalized vectors.

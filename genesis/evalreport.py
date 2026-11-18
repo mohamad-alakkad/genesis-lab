@@ -8,7 +8,7 @@ from genesis import ckpt, ppo
 from genesis.evalonly import suite
 
 REPORTS = ckpt.ROOT / "docs" / "reports"
-METRICS = ("food", "ticks", "survived", "hazard", "dist", "contact")
+METRICS = ("ticks", "food", "caught", "survived", "shelter_when_threat", "shelter_at_night", "rest_frac", "dash_when_threat")
 
 
 def load_policy(d: Path):
@@ -48,22 +48,22 @@ def evaluate_checkpoint(ckpt_id, run_id, n, families):
     b = baselines(n, fams)
     res = {"schema": "genesis.eval/1", "checkpoint_id": man["checkpoint_id"], "suite": "heldout-v1",
            "seeds_range": f"eval_seed_base + family offset + [0, {n})", "episodes_per_family": n, "deterministic": True,
-           "families": {f: {"policy": pol[f], "random": b["random"][f], "heuristic": b["heuristic"][f]} for f in fams}}
-    wins = {f: _beats(pol[f]["food"], b["random"][f]["food"]) and _beats(pol[f]["food"], b["heuristic"][f]["food"]) for f in fams}
+           "families": {f: {"policy": pol[f], **{k: b[k][f] for k in ("random", "forager", "survivor")}} for f in fams}}
+    wins = {f: _beats(pol[f]["ticks"], b["random"][f]["ticks"]) and _beats(pol[f]["ticks"], b["survivor"][f]["ticks"]) for f in fams}
     verdict = "learned" if all(wins.values()) else ("partially" if any(wins.values()) else "not_learned")
-    res["verdict"] = verdict; res["beats_both_baselines_on_food"] = wins
+    res["verdict"] = verdict; res["beats_random_and_survivor_on_survival"] = wins
     REPORTS.mkdir(parents=True, exist_ok=True)
     name = man["checkpoint_id"].replace("/", "-")
     ckpt.atomic_write(REPORTS / f"eval-{name}.json", json.dumps(res, indent=1).encode())
     md = [f"# Evaluation — {man['checkpoint_id']}", "", f"Verdict: **{verdict}** · {n} deterministic episodes per family · held-out seeds", "",
-          "| family | metric | policy | random | heuristic |", "|---|---|---|---|---|"]
+          "| family | metric | policy | random | forager | survivor |", "|---|---|---|---|---|---|"]
     for f in fams:
-        for m in ("food", "ticks", "survived", "hazard"):
+        for m in METRICS:
             c = lambda x: f"{x[m]['mean']} [{x[m]['ci95'][0]}, {x[m]['ci95'][1]}]"
-            md.append(f"| {f} | {m} | {c(pol[f])} | {c(b['random'][f])} | {c(b['heuristic'][f])} |")
+            md.append(f"| {f} | {m} | {c(pol[f])} | {c(b['random'][f])} | {c(b['forager'][f])} | {c(b['survivor'][f])} |")
     ckpt.atomic_write(REPORTS / f"eval-{name}.md", ("\n".join(md) + "\n").encode())
     for f in fams:
-        print(f"{f:14s} food {pol[f]['food']['mean']:6.2f} (rand {b['random'][f]['food']['mean']:.2f}, heur {b['heuristic'][f]['food']['mean']:.2f}) "
-              f"survived {pol[f]['survived']['mean']:.2f}")
+        print(f"{f:14s} survival {pol[f]['ticks']['mean']:7.1f} (rand {b['random'][f]['ticks']['mean']:.0f}, survivor {b['survivor'][f]['ticks']['mean']:.0f}) "
+              f"caught {pol[f]['caught']['mean']:.2f} food {pol[f]['food']['mean']:.1f}")
     print(f"verdict: {verdict} → docs/reports/eval-{name}.md")
     return 0

@@ -1,0 +1,20 @@
+{
+ "run_id": "gen3-s3",
+ "host_id": "vm",
+ "session_id": "6ec5d25d",
+ "pid": 361,
+ "global_step": 24018944,
+ "wall_time_s": 2135.0,
+ "updated_at": "2026-11-18T17:34:58Z",
+ "updated_ts": 1795023298.5317976,
+ "last_local_ckpt": "gen3-s3/0024018944",
+ "last_local_ckpt_ts": 1795023298.4940484,
+ "last_remote_publish": {
+  "checkpoint_id": "gen3-s3/0020021248",
+  "commit": "3b9b25977f038e4114921b35ef7082ec60ec6738",
+  "published_at": "2026-11-18T17:31:06Z"
+ },
+ "steps_per_sec": 12156,
+ "rss_mb": 114.1,
+ "segment_index": 1
+}

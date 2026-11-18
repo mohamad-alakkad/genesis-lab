@@ -172,7 +172,13 @@ export function initResearch(api) {
       <li>Checkpoints: write → SHA-256 → load-test → manifest → published to a git store; cloud cycles resume from it (verified across fresh sandboxes).</li>` }));
     return wrap;
   }
+  // color follows identity: the run (≤ 4 runs) or the experimental arm (> 4 runs; the arm's second seed is drawn fainter)
+  const armOf = (id) => id.replace(/-s\d+$/, "");
+  const styleOf = (runs) => { const arms = [...new Set(runs.map((r) => armOf(r.run_id)))], byArm = runs.length > 4;
+    return runs.map((r, i) => byArm ? { color: SEED_COLORS[arms.indexOf(armOf(r.run_id)) % 4], op: runs.filter((q, j) => j < i && armOf(q.run_id) === armOf(r.run_id)).length ? 0.5 : 1 }
+      : { color: SEED_COLORS[i % 4], op: 1 }); };
   function lineChart(runs, key, title, ref, isFrac = false) {
+    const sty = styleOf(runs);
     const W = 560, H = 190, L = 44, R = 12, T = 12, B = 30;
     const pts = runs.map((r) => r.eval.filter((e) => e[key] != null).map((e) => [e.step, e[key]]));
     const xmax = Math.max(...pts.flat().map((p) => p[0]), 1), ys = pts.flat().map((p) => p[1]).concat(ref?.y ?? []);
@@ -183,20 +189,20 @@ export function initResearch(api) {
     for (let i = 0; i <= 4; i++) { const x = xmax * i / 4; svg.append(svgText(X(x), H - 10, `${(x / 1e6).toFixed(0)}M`, "middle")); }
     svg.append(svgText(W - R, H - 10 + 0, "", "end"));
     if (ref?.y) svg.append(svgEl("line", { x1: L, x2: W - R, y1: Y(ref.y), y2: Y(ref.y), class: "ref" }), svgText(W - R - 2, Y(ref.y) - 5, `${ref.label}: ${ref.y.toFixed(0)}`, "end", "refl"));
-    pts.forEach((p, i) => { if (!p.length) return; svg.append(svgEl("polyline", { points: p.map(([x, y]) => `${X(x)},${Y(y)}`).join(" "), fill: "none", stroke: SEED_COLORS[i % 4], "stroke-width": 2 }));
-      const [lx, ly] = p[p.length - 1]; svg.append(svgEl("circle", { cx: X(lx), cy: Y(ly), r: 4, fill: SEED_COLORS[i % 4], stroke: "#0E1822", "stroke-width": 2 })); });
+    pts.forEach((p, i) => { if (!p.length) return; svg.append(svgEl("polyline", { points: p.map(([x, y]) => `${X(x)},${Y(y)}`).join(" "), fill: "none", stroke: sty[i].color, "stroke-opacity": sty[i].op, "stroke-width": 2 }));
+      const [lx, ly] = p[p.length - 1]; svg.append(svgEl("circle", { cx: X(lx), cy: Y(ly), r: 4, fill: sty[i].color, "fill-opacity": sty[i].op, stroke: "#0E1822", "stroke-width": 2 })); });
     // hover: crosshair + tooltip with every seed's value at the nearest evaluation
     const hair = svgEl("line", { y1: T, y2: H - B, class: "hair", visibility: "hidden" }); svg.append(hair);
     const tip = el("div", { class: "rc-tip", hidden: "" });
     const box = el("figure", { class: "rc-fig" }, el("figcaption", { html: `${title} ${tag("LOG")}` }), svg, tip,
-      el("div", { class: "rc-legend" }, ...runs.map((r, i) => el("span", { html: `<i style="background:${SEED_COLORS[i % 4]}"></i>${r.run_id}` }))));
+      el("div", { class: "rc-legend" }, ...runs.map((r, i) => el("span", { html: `<i style="background:${sty[i].color};opacity:${sty[i].op}"></i>${r.run_id}` }))));
     svg.addEventListener("pointermove", (e) => {
       const rect = svg.getBoundingClientRect(), x = ((e.clientX - rect.left) / rect.width) * W; if (x < L || x > W - R) { hair.setAttribute("visibility", "hidden"); tip.hidden = true; return; }
       const step = ((x - L) / (W - L - R)) * xmax;
       hair.setAttribute("x1", x); hair.setAttribute("x2", x); hair.setAttribute("visibility", "visible");
       tip.hidden = false; tip.style.left = `${(x / W) * 100}%`;
       tip.innerHTML = `<b>${(step / 1e6).toFixed(1)}M steps</b>` + runs.map((r, i) => { const near = r.eval.filter((q) => q[key] != null).reduce((a, q) => Math.abs(q.step - step) < Math.abs(a.step - step) ? q : a, r.eval[0]);
-        return `<div><i style="background:${SEED_COLORS[i % 4]}"></i>${r.run_id}: ${isFrac ? pct(near[key]) : fmt(near[key], 0)}${near.score_ci95 && !isFrac ? ` [${fmt(near.score_ci95[0], 0)}, ${fmt(near.score_ci95[1], 0)}]` : ""} <span>@${(near.step / 1e6).toFixed(1)}M</span></div>`; }).join("");
+        return `<div><i style="background:${sty[i].color};opacity:${sty[i].op}"></i>${r.run_id}: ${isFrac ? pct(near[key]) : fmt(near[key], 0)}${near.score_ci95 && !isFrac ? ` [${fmt(near.score_ci95[0], 0)}, ${fmt(near.score_ci95[1], 0)}]` : ""} <span>@${(near.step / 1e6).toFixed(1)}M</span></div>`; }).join("");
     });
     svg.addEventListener("pointerleave", () => { hair.setAttribute("visibility", "hidden"); tip.hidden = true; });
     return box;

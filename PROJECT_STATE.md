@@ -29,7 +29,7 @@
 - [x] Stage B: v1 t-short (0.13 → 6.63) and gen1 cloud (0.08 → 27.7)
 - [x] Stage C: v2 baselines random/forager/survivor (`evalonly/suite.py`)
 - [x] Pipeline round-trip to GitHub from the cloud: gen1 store branches
-- [ ] Detached segment without session: gen2 hourly cycles (verify a second cycle resumes from the store)
+- [x] Detached segment without session + cross-environment resume: gen2 cycle 2 (fresh sandbox, 15:57Z) resumed at 32,669,696 from the store, prev end confirmed, 0 s lost
 - [ ] Resilience test a–f: run in the cloud (kill / fresh-clone fetch / corrupt checkpoint)
 - [ ] Stage D/E eval + reward-hacking audit (gen2)
 - [ ] World + policy parity: v1 PASSED; v2 world PASSED (20 fixtures × 900 steps incl. visitor events); v2 policy parity test to regenerate with the final brain

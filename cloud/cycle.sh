@@ -6,7 +6,7 @@ MIN=${1:-50}; shift || true
 SEEDS=${*:-1}
 cd "$(git rev-parse --show-toplevel)"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
-LINEAGE=${GENESIS_LINEAGE:-gen2}
+LINEAGE=${GENESIS_LINEAGE:-gen3}
 python3 -m pip install -q numpy psutil pytest >/dev/null 2>&1 || pip install -q numpy psutil pytest >/dev/null 2>&1
 mkdir -p runs
 python3 - > runs/cloud_env.json <<'PY'

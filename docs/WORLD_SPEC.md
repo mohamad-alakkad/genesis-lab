@@ -1,6 +1,6 @@
 # GENESIS world specification
 
-**Version:** 2.0.0 · **Status:** frozen for lineage gen2 · **Changelog:** 1.0.0 seeds/vents/slates, tag `v1-baseline` · 2.0.0 living world (momentum, stamina, rest, shelters, meadows with regrowth, pools, rain, day/night, stalking predator)
+**Version:** 2.1.0 · **Status:** frozen for lineage gen3 · **Changelog:** 1.0.0 seeds/vents/slates, tag `v1-baseline` · 2.0.0 living world (gen2) · 2.1.0 meadows at thicket edges (2–4 u from a shelter edge), stalk hearing 1.5 → 2.5 (gen2 never discovered hiding: 0.3% shelter use under threat)
 
 All numbers live in `genesis/world_constants.json`, shared byte-for-byte with the JS port. Reference implementation: `genesis/world.py`. Coordinates: x right, y **down**.
 
@@ -12,7 +12,7 @@ All numbers live in `genesis/world_constants.json`, shared byte-for-byte with th
 ## 2. Entities
 - **Vela (creature):** radius 0.3; speed v and turn rate ω with momentum (§3); energy (hunger) and stamina (exertion), both in [0, 1].
 - **Seeds (food):** `food_n` slots, each bound to meadow i mod 3. Placed within 2.2 u of the meadow center (polar draw), never in slates, shelters, pools or active vents, and > 1 u from Vela. Eating: +0.25 energy (cap 1), reward +1. The slot then **regrows** after 120–249 ticks (twice as fast in rain) at a new point of the same meadow.
-- **Meadows (3):** open ground ≥ 2.2 u beyond shelter edges and ≥ 1 u from pools, so food and safety are separated.
+- **Meadows (3):** open ground 2.0–4.0 u from the nearest shelter edge (the forest-edge ecotone: food in the open, cover within reach), ≥ 1 u from pools.
 - **Shelters (thickets, 2–4):** circles r 0.9–1.3. Inside a shelter, Vela cannot be seen or caught. The predator cannot enter (it is pushed out).
 - **Pools (1–2):** circles r 1.2–2.0. Inside, Vela's target speed ×0.55 and the predator's speed ×0.6.
 - **Vents (2):** circles r 0.6–0.9 with active/dormant cycles (active 150–399, dormant 100–299). In an active vent: energy −0.02/tick and reward −0.05/tick.
@@ -44,7 +44,7 @@ All numbers live in `genesis/world_constants.json`, shared byte-for-byte with th
 ## 5. Observations (89 floats in [−1, 1])
 - Rays: 11 over ±120° (k = 0 leftmost), range 6. Channels per ray (index 6k + c): 0 solid (wall/slate), 1 seed, 2 active vent, 3 shelter, 4 predator (only if within sight = lerp(2.5 at night, 6 at noon)), 5 pool. Value = 1 − min(t, 6)/6.
 - 66 energy · 67 stamina · 68 v/0.22 · 69 ω/0.25 · 70 in_shelter · 71 in_vent · 72 in_water · 73 contact · 74 light · 75 raining · 76 sin(day phase) · 77 cos(day phase)
-- 78–80 hearing: predator within hearing radius (pounce 6, stalk 1.5, patrol/search 3; ×0.6 in rain; silent when resting) → proximity 1 − d/r, sin and cos of the bearing relative to heading (0 when not heard)
+- 78–80 hearing: predator within hearing radius (pounce 6, stalk 2.5, patrol/search 3; ×0.6 in rain; silent when resting) → proximity 1 − d/r, sin and cos of the bearing relative to heading (0 when not heard)
 - 81–88 one-hot of the last action (reset: rest)
 
 ## 6. Reward

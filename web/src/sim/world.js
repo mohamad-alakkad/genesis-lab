@@ -129,8 +129,10 @@ export class World {
       Object.assign(this.vents[v], { x, y, r, present: true, on: active });
       this.vents[v].timer = this.ventDuration(active);
     }
+    const nearShelter = (x, y) => this.shelters.some((s) => s.on && norm2(s.x - x, s.y - y) - s.r <= c.meadow_shelter_max);
     for (const m of this.meadows) {
-      const [x, y] = this.samplePoint(1.5, (x, y) => this.sheltersOk(x, y, 2.2) && this.slatesOk(x, y, 0.0) && this.poolsOk(x, y, 1.0));
+      const [x, y] = this.samplePoint(1.5, (x, y) => this.sheltersOk(x, y, c.meadow_shelter_min) && nearShelter(x, y)
+        && this.slatesOk(x, y, 0.0) && this.poolsOk(x, y, 1.0));
       m.x = x; m.y = y;
     }
     const [cx, cy] = this.samplePoint(rc + 0.1, (x, y) => {

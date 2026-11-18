@@ -222,10 +222,13 @@ class World:
             self.vent_pos[mv, v] = pts[mv]; self.vent_r[mv, v] = r[mv]; self.vent_present[mv, v] = True
             self.vent_on[mv, v] = active[mv]
             self.vent_timer[mv, v] = self._vent_duration(mv, active)[mv]
-        # 4. meadows (open ground, away from shelters)
+        # 4. meadows: open ground at a thicket's edge (food in the open, cover within reach)
+        def clear_m(p):
+            d = _norm(self.sh_pos - p[:, None, :]) - self.sh_r
+            near = np.any(self.sh_on & (d <= c["meadow_shelter_max"]), 1)
+            return self._shelters_ok(p, c["meadow_shelter_min"]) & near & self._slates_ok(p, 0.0) & self._pools_ok(p, 1.0)
         for k in range(c["n_meadows"]):
-            pts, _ = self._sample_point(m, 1.5, lambda p: self._shelters_ok(p, 2.2) & self._slates_ok(p, 0.0)
-                                        & self._pools_ok(p, 1.0))
+            pts, _ = self._sample_point(m, 1.5, clear_m)
             self.meadow[m, k] = pts[m]
         # 5. creature
         def clear_c(p):

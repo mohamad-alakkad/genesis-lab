@@ -1,0 +1,35 @@
+{
+ "schema": "genesis.manifest/1",
+ "run_id": "gen4-mem-g997-s1",
+ "checkpoint_id": "gen4-mem-g997-s1/0040009728",
+ "parent": null,
+ "global_step": 40009728,
+ "wall_clock_trained_s": 3487.8,
+ "created_at": "2026-11-18T20:14:22Z",
+ "files": [
+  {
+   "path": "model.npz",
+   "sha256": "5be83b6e7eaa9a2dd339c6e6870c9e2acf2a8f3f69ef38fcf3d9e8fd97a44edb",
+   "size": 1414964
+  },
+  {
+   "path": "state.json",
+   "sha256": "834e46ea860313c71619b12b7f429ad0754781b330ba1c979744cc2d0e27b0b9",
+   "size": 2710
+  }
+ ],
+ "config_hash": "sha256:875bb12175f876fa52f775bb1201c6e66b695143a2d96c85910ff7ca77b2d099",
+ "world_spec_version": "2.2.0",
+ "code_commit": "10bc231",
+ "code_dirty": false,
+ "dependencies": {
+  "python": "3.11.18",
+  "numpy": "2.4.6"
+ },
+ "verified": true,
+ "last_known_good": "gen4-mem-g997-s1/0040009728",
+ "milestones": [
+  "final"
+ ],
+ "eval_summary": null
+}

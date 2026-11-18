@@ -1,0 +1,20 @@
+{
+ "run_id": "gen4-nomem-g997-s1",
+ "host_id": "vm",
+ "session_id": "20332749",
+ "pid": 326,
+ "global_step": 40009728,
+ "wall_time_s": 3613.5,
+ "updated_at": "2026-11-18T20:07:41Z",
+ "updated_ts": 1795032461.4450588,
+ "last_local_ckpt": "gen4-nomem-g997-s1/0040009728",
+ "last_local_ckpt_ts": 1795032461.3957076,
+ "last_remote_publish": {
+  "checkpoint_id": "gen4-nomem-g997-s1/0038010880",
+  "commit": "1778be977d61279d7159c5e2ad2a75d6fbe2f8ac",
+  "published_at": "2026-11-18T20:06:00Z"
+ },
+ "steps_per_sec": 10076,
+ "rss_mb": 51.7,
+ "segment_index": 2
+}

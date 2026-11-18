@@ -40,7 +40,9 @@ function resize() {
   cam.left = -vh * a / 2; cam.right = vh * a / 2; cam.top = vh / 2; cam.bottom = -vh / 2; cam.updateProjectionMatrix();
 }
 addEventListener("resize", resize); resize();
-function placeCamera() { cam.position.set(camTarget.x, camTarget.y + Math.sin(ELEV) * 40, camTarget.z + Math.cos(ELEV) * 40); cam.lookAt(camTarget); }
+function placeCamera() { cam.position.set(camTarget.x, camTarget.y + Math.sin(ELEV) * 40, camTarget.z + Math.cos(ELEV) * 40); cam.lookAt(camTarget);
+  if (isPhone && !document.body.classList.contains("ui-hidden")) { cam.position.z += 0.6; cam.position.y += 0.0; }  // shift view so Vela sits above the bottom chrome
+}
 
 // ------------------------------------------------------------------ light
 const hemi = new THREE.HemisphereLight(0xbfe6ee, 0x1a3240, 1.0); scene.add(hemi);
@@ -118,7 +120,7 @@ const waterMat = new THREE.ShaderMaterial({ transparent: true, uniforms: { uTime
     }` });
 const seedMat = new THREE.MeshStandardMaterial({ color: 0xffd3a1, emissive: pal.energy, emissiveIntensity: 1.6, roughness: 0.3 });
 const haloTex = makeHalo();
-function makeHalo() { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.3, "rgba(255,255,255,.35)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); return t; }
+function makeHalo() { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.3, "rgba(255,255,255,.35)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); return t; }
 function halo(color, size, opacity) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.set(size, size, 1); return s; }
 const shadowTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(0,0,0,.6)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
 function contactShadow(size) { const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = 0.01; return m; }
@@ -366,7 +368,15 @@ document.querySelectorAll(".tools button").forEach((b) => b.addEventListener("cl
   if (tool) toast({ seed: "Tap open ground to move a seed there.", slate: "Tap open ground to place a slate.", vent: "Tap a vent ring to wake it.", sound: "Tap anywhere: the predator will come to search where Vela is." }[tool], 2400);
 }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") { tool = null; document.querySelectorAll(".tools button").forEach((x) => x.setAttribute("aria-pressed", "false")); } if (e.key === " ") { paused = !paused; toast(paused ? "Paused" : "Resumed", 900); e.preventDefault(); } });
+// phone: a tap on the world (no tool active) hides or shows the panels; the gear opens settings
+$("gear").onclick = () => { const o = !document.body.classList.contains("settings-open"); document.body.classList.toggle("settings-open", o); $("gear").setAttribute("aria-expanded", String(o)); };
+let hintShown = false;
+function showHint() { if (hintShown || !isPhone) return; hintShown = true; const h = $("uihint"); h.classList.add("show"); setTimeout(() => h.classList.remove("show"), 4000); }
 canvas.addEventListener("pointerdown", (e) => {
+  if (!tool && isPhone && world) {
+    if (document.body.classList.contains("settings-open")) { document.body.classList.remove("settings-open"); $("gear").setAttribute("aria-expanded", "false"); return; }
+    document.body.classList.toggle("ui-hidden"); return;
+  }
   if (!tool || !world) return;
   const r = canvas.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), cam);
@@ -605,6 +615,6 @@ async function boot() {
     $("loadNote").textContent = `Could not load the Fold: ${err.message}`;
   }
 }
-$("enter").onclick = async () => { $("veil").classList.add("gone"); try { await sound.start(); sound.setVolume(+$("volume").value); } catch (e) { toast("Sound is unavailable in this browser.", 3000); } };
+$("enter").onclick = async () => { $("veil").classList.add("gone"); setTimeout(showHint, 1500); try { await sound.start(); sound.setVolume(+$("volume").value); } catch (e) { toast("Sound is unavailable in this browser.", 3000); } };
 if (params.has("auto")) $("veil").classList.add("gone");  // screenshots / kiosk
 boot();

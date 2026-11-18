@@ -90,9 +90,10 @@
 body.rc-on .panel { display: none; }
 body.rc-on .tools { right: calc(min(600px, 48vw) + 2%); }
 @media (max-width: 650px) {
-  .rc-open { left: auto; right: 20px; top: calc(max(14px, env(safe-area-inset-top)) + 6px); padding: 6px 10px; }
-  .rc-open .rc-s { display: none; }
-  .rc { width: 100%; top: auto; height: 72vh; border-left: 0; border-top: 1px solid rgba(142,115,255,.3); border-radius: 14px 14px 0 0; }
+  .rc-open { left: auto; right: 68px; top: max(10px, env(safe-area-inset-top)); padding: 4px 10px; min-height: 44px; justify-content: center; }
+  .rc-open .rc-t { font-size: 10px; } .rc-open .rc-s { display: none; }
+  .rc { height: 62vh; }
+  .rc { width: 100%; top: auto; border-left: 0; border-top: 1px solid rgba(142,115,255,.3); border-radius: 14px 14px 0 0; }
   .rc-grid2 { grid-template-columns: 1fr; }
   body.rc-on .tools, body.rc-on .specimen { display: none; }
 }

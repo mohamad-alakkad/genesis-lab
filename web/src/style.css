@@ -53,13 +53,30 @@ button.small { padding: 5px 10px; font-size: 11px; }
 .veil p { font-family: var(--display); font-size: 22px; line-height: 1.35; color: var(--text); }
 .veil p.note { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.6; }
 button#enter { margin-top: 10px; padding: 14px 28px; font-size: 14px; letter-spacing: 0.12em; border-color: var(--life); min-height: 46px; }
+.gear, .uihint { display: none; }
 @media (max-width: 650px) {
-  .wordmark { font-size: 22px; } .wordmark.big { font-size: 52px; } .veil p { font-size: 18px; }
-  .brand { left: 20px; }
-  .panel { left: 20px; right: 20px; width: auto; top: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 210px); padding: 6px 10px; }
+  /* phone: the world comes first; chrome is compact, edge-anchored and can be hidden with a tap */
+  .wordmark { font-size: 18px; } .wordmark.big { font-size: 52px; } .veil p { font-size: 18px; }
+  .brand { left: 16px; top: max(12px, env(safe-area-inset-top)); } .tagline { display: none; }
+  .gear { display: grid; place-items: center; position: fixed; top: max(10px, env(safe-area-inset-top)); right: 16px; width: 44px; height: 44px;
+    background: var(--scrim); border: 1px solid rgba(236,245,244,.18); border-radius: 10px; color: var(--text); backdrop-filter: blur(6px); z-index: 4; }
+  .gear svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+  .panel { display: none; left: 16px; right: 16px; width: auto; top: calc(max(10px, env(safe-area-inset-top)) + 52px); bottom: auto; z-index: 4; }
+  body.settings-open .panel { display: block; }
   .panel .honesty { display: none; }
-  .specimen { left: 20px; right: 20px; width: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 70px); padding: 10px 12px; }
-  .tools { left: 20px; right: 20px; justify-content: space-between; bottom: max(14px, env(safe-area-inset-bottom)); }
-  .tools button { flex: 1; height: 50px; }
+  .specimen { left: 12px; right: 12px; width: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 56px); padding: 6px 10px; border-radius: 10px;
+    display: grid; grid-template-columns: auto 1fr; grid-template-areas: "name gauges" "state gauges"; column-gap: 12px; align-items: center; }
+  .spec-name { grid-area: name; font-size: 17px; line-height: 1.1; } .spec-name .mono { display: none; }
+  .state { grid-area: state; font-size: 10px; margin: 0; min-height: 0; }
+  .gauges { grid-area: gauges; } .gauges label { font-size: 9px; margin: 2px 0; gap: 6px; }
+  .world { display: none; }
+  .tools { left: 12px; right: 12px; justify-content: space-between; gap: 6px; bottom: max(8px, env(safe-area-inset-bottom)); }
+  .tools button { flex: 1; width: auto; height: 44px; flex-direction: row; gap: 6px; font-size: 11px; }
+  .tools svg { width: 18px; height: 18px; }
+  .uihint { display: block; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(max(10px, env(safe-area-inset-bottom)) + 112px);
+    font: 10px var(--mono); color: var(--muted); background: var(--scrim); padding: 4px 8px; border-radius: 6px; pointer-events: none; opacity: 0; transition: opacity .6s; }
+  .uihint.show { opacity: .9; }
+  body.ui-hidden .brand, body.ui-hidden .specimen, body.ui-hidden .tools, body.ui-hidden .gear, body.ui-hidden .panel, body.ui-hidden .rc-open { opacity: 0; pointer-events: none; }
+  .brand, .specimen, .tools, .gear, .rc-open { transition: opacity .35s; }
 }
 @media (prefers-reduced-motion: reduce) { .bar i, .state, .toast, .veil { transition: none; } }

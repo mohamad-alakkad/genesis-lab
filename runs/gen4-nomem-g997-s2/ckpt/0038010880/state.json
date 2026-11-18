@@ -1,0 +1,164 @@
+{
+ "global_step": 38010880,
+ "episodes": 38674,
+ "segments": 2,
+ "wall_trained_s": 3443.6392588615417,
+ "updates": 1160,
+ "best": {
+  "suite": "heldout-standard",
+  "step": 36012032,
+  "score": 1065.5,
+  "score_ci95": [
+   967.0535,
+   1163.9465
+  ],
+  "food_mean": 21.52,
+  "survived": 0.47,
+  "caught": 0.37,
+  "shelter_when_threat": 0.0302,
+  "hazard": 1.26,
+  "episodes": 100,
+  "checkpoint_id": "gen4-nomem-g997-s2/0036012032"
+ },
+ "evals": 20,
+ "since_best": 1,
+ "consec_target": 0,
+ "init_seed": 2,
+ "interruptions": 0,
+ "lost_time_s": 0.0,
+ "milestones_done": [
+  "step0",
+  "early",
+  "middle"
+ ],
+ "eval_latest": {
+  "suite": "heldout-standard",
+  "step": 38010880,
+  "score": 927.85,
+  "score_ci95": [
+   828.1354,
+   1027.5646
+  ],
+  "food_mean": 18.51,
+  "survived": 0.35,
+  "caught": 0.52,
+  "shelter_when_threat": 0.0294,
+  "hazard": 0.69,
+  "episodes": 100
+ },
+ "ckpt_overhead_s": 1.1705193519592285,
+ "last_publish": {
+  "checkpoint_id": "gen4-nomem-g997-s2/0032014336",
+  "commit": "2ae7fc2bb0af53ba5f5a8020ba41395671915dde",
+  "published_at": "2026-11-18T19:57:54Z"
+ },
+ "prev_end_reason": "segment_done",
+ "config": {
+  "n_envs": 256,
+  "n_steps": 128,
+  "epochs": 4,
+  "minibatch": 2048,
+  "lr": 0.0003,
+  "gamma": 0.997,
+  "lam": 0.95,
+  "clip": 0.2,
+  "ent_coef": 0.01,
+  "vf_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "hidden": [
+   128,
+   128
+  ],
+  "total_steps": 40000000,
+  "segment_minutes": 45.0,
+  "ckpt_minutes": 4,
+  "first_ckpt_s": 45,
+  "publish_minutes": 8,
+  "heartbeat_s": 30,
+  "eval_every_steps": 2000000,
+  "eval_episodes": 100,
+  "target_survival": 0.9,
+  "plateau_evals": 1000,
+  "plateau_eps": 15.0,
+  "seed": 2,
+  "rss_soft_mb": 1400,
+  "rss_hard_mb": 1600,
+  "host_min_avail_frac": 0.1,
+  "milestone_steps": {
+   "early": 2000000
+  },
+  "obs_mask": [
+   81,
+   82,
+   83,
+   84,
+   85
+  ]
+ },
+ "rng": {
+  "seed": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 250306296450727975391763906605423820284,
+    "inc": 197198657951681906595493522535810024969
+   },
+   "has_uint32": 0,
+   "uinteger": 2665173889
+  },
+  "act": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 100209812544019398181327537111678720899,
+    "inc": 155635070427493321128207088479992175333
+   },
+   "has_uint32": 0,
+   "uinteger": 72690866
+  }
+ },
+ "adam_t": 74240,
+ "norm_count": 38010880.0001,
+ "arch": {
+  "pi.W0": [
+   94,
+   128
+  ],
+  "pi.W1": [
+   128,
+   128
+  ],
+  "pi.W2": [
+   128,
+   8
+  ],
+  "pi.b0": [
+   128
+  ],
+  "pi.b1": [
+   128
+  ],
+  "pi.b2": [
+   8
+  ],
+  "v.W0": [
+   94,
+   128
+  ],
+  "v.W1": [
+   128,
+   128
+  ],
+  "v.W2": [
+   128,
+   1
+  ],
+  "v.b0": [
+   128
+  ],
+  "v.b1": [
+   128
+  ],
+  "v.b2": [
+   1
+  ]
+ }
+}

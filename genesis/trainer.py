@@ -141,7 +141,11 @@ class Trainer:
                   "train_recent": {k: round(float(np.mean(v)), 3) if v else None for k, v in self.recent.items()},
                   "diag": self.diag, "total_steps": self.cfg["total_steps"],
                   "persistence_warning": None if remote else persist.WARNING}
-        _jdump(RUNS / "status.json", status)
+        _jdump(self.dir / "status.json", status)  # per-run status (concurrent trainers share runs/)
+        try:
+            _jdump(RUNS / "status.json", status)  # convenience copy for single-run use; never fatal
+        except OSError:
+            pass
         self.last_hb = time.time()
         return rss
 

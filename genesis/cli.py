@@ -27,7 +27,10 @@ def current_run():
 
 def set_current(run_id):
     RUNS.mkdir(exist_ok=True)
-    ckpt.atomic_write(RUNS / "CURRENT", (run_id + "\n").encode())
+    try:
+        ckpt.atomic_write(RUNS / "CURRENT", (run_id + "\n").encode())
+    except OSError:
+        pass  # convenience pointer only; concurrent trainers may race on it
 
 
 def _parse_sets(sets):

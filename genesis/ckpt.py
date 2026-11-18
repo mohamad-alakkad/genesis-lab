@@ -27,9 +27,15 @@ def sha256_file(p):
 
 
 def atomic_write(path: Path, data: bytes):
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")  # per-process temp name: concurrent trainers share runs/
     with open(tmp, "wb") as f:
         f.write(data); f.flush(); os.fsync(f.fileno())
+    for i in range(50):  # Windows refuses a replace while another process is replacing the same target; retry briefly
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            time.sleep(0.01 * (1 + i % 5))
     os.replace(tmp, path)
 
 

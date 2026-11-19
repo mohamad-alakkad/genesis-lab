@@ -1,0 +1,8 @@
+{
+ "end_reason": "budget_exhausted",
+ "state": "budget_exhausted",
+ "step": 50003968,
+ "at": "2026-11-19T10:27:47Z",
+ "at_ts": 1795084067.6103475,
+ "checkpoint": "gen5-broad-s2/0050003968"
+}

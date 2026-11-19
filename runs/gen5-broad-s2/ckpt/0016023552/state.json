@@ -1,0 +1,157 @@
+{
+ "global_step": 16023552,
+ "episodes": 19730,
+ "segments": 1,
+ "wall_trained_s": 1441.0053553581238,
+ "updates": 489,
+ "best": {
+  "suite": "heldout-standard",
+  "step": 16023552,
+  "score": 1099.5,
+  "score_ci95": [
+   1010.6153,
+   1188.3847
+  ],
+  "food_mean": 22.15,
+  "survived": 0.48,
+  "caught": 0.37,
+  "shelter_when_threat": 0.0222,
+  "hazard": 2.63,
+  "episodes": 100,
+  "checkpoint_id": "gen5-broad-s2/0016023552"
+ },
+ "evals": 9,
+ "since_best": 0,
+ "consec_target": 0,
+ "init_seed": 2,
+ "interruptions": 0,
+ "lost_time_s": 0.0,
+ "milestones_done": [
+  "step0",
+  "early"
+ ],
+ "eval_latest": {
+  "suite": "heldout-standard",
+  "step": 16023552,
+  "score": 1099.5,
+  "score_ci95": [
+   1010.6153,
+   1188.3847
+  ],
+  "food_mean": 22.15,
+  "survived": 0.48,
+  "caught": 0.37,
+  "shelter_when_threat": 0.0222,
+  "hazard": 2.63,
+  "episodes": 100
+ },
+ "ckpt_overhead_s": 0.35508060455322266,
+ "last_publish": {
+  "checkpoint_id": "gen5-broad-s2/0010027008",
+  "commit": "4a827b72eda450a339e395bec29d64c170c1ccf4",
+  "published_at": "2026-11-19T09:15:14Z"
+ },
+ "config": {
+  "n_envs": 256,
+  "n_steps": 128,
+  "epochs": 4,
+  "minibatch": 2048,
+  "lr": 0.0003,
+  "gamma": 0.997,
+  "lam": 0.95,
+  "clip": 0.2,
+  "ent_coef": 0.01,
+  "vf_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "hidden": [
+   128,
+   128
+  ],
+  "total_steps": 50000000,
+  "segment_minutes": 45.0,
+  "ckpt_minutes": 4,
+  "first_ckpt_s": 45,
+  "publish_minutes": 8,
+  "heartbeat_s": 30,
+  "eval_every_steps": 2000000,
+  "eval_episodes": 100,
+  "target_survival": 0.9,
+  "plateau_evals": 1000,
+  "plateau_eps": 15.0,
+  "seed": 2,
+  "rss_soft_mb": 1400,
+  "rss_hard_mb": 1600,
+  "host_min_avail_frac": 0.1,
+  "milestone_steps": {
+   "early": 2000000
+  },
+  "obs_mask": [],
+  "train_family": "train_broad"
+ },
+ "rng": {
+  "seed": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 96424850890204559920040292159598069628,
+    "inc": 197198657951681906595493522535810024969
+   },
+   "has_uint32": 0,
+   "uinteger": 2436793122
+  },
+  "act": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 52208436822785593757886349505312875971,
+    "inc": 155635070427493321128207088479992175333
+   },
+   "has_uint32": 0,
+   "uinteger": 1287828563
+  }
+ },
+ "adam_t": 31296,
+ "norm_count": 16023552.0001,
+ "arch": {
+  "pi.W0": [
+   95,
+   128
+  ],
+  "pi.W1": [
+   128,
+   128
+  ],
+  "pi.W2": [
+   128,
+   8
+  ],
+  "pi.b0": [
+   128
+  ],
+  "pi.b1": [
+   128
+  ],
+  "pi.b2": [
+   8
+  ],
+  "v.W0": [
+   95,
+   128
+  ],
+  "v.W1": [
+   128,
+   128
+  ],
+  "v.W2": [
+   128,
+   1
+  ],
+  "v.b0": [
+   128
+  ],
+  "v.b1": [
+   128
+  ],
+  "v.b2": [
+   1
+  ]
+ }
+}

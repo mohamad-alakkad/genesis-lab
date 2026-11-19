@@ -1,0 +1,4 @@
+{"segment": 1, "event": "start", "host_id": "vm", "pid": 347, "start": "2026-11-19T10:58:34Z", "steps_start": 0, "recovered_from": "gen6-food-s2/0000000000", "prev_end": null}
+{"segment": 1, "event": "end", "end": "2026-11-19T11:43:39Z", "end_reason": "segment_done", "end_confirmed": true, "steps_start": 0, "steps_end": 26312704, "lost_time_s": 0, "peak_rss_mb": 104.7, "checkpoint": "gen6-food-s2/0026312704"}
+{"segment": 2, "event": "start", "host_id": "vm", "pid": 311, "start": "2026-11-19T11:57:51Z", "steps_start": 26312704, "recovered_from": "gen6-food-s2/0026312704", "prev_end": {"reason": "segment_done", "confirmed": true, "lost_time_s": 0.0}}
+{"segment": 2, "event": "end", "end": "2026-11-19T12:31:22Z", "end_reason": "budget_exhausted", "end_confirmed": true, "steps_start": 26312704, "steps_end": 50003968, "lost_time_s": 0, "peak_rss_mb": 97.7, "checkpoint": "gen6-food-s2/0050003968"}

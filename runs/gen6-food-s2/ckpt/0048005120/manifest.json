@@ -1,0 +1,49 @@
+{
+ "schema": "genesis.manifest/1",
+ "run_id": "gen6-food-s2",
+ "checkpoint_id": "gen6-food-s2/0048005120",
+ "parent": null,
+ "global_step": 48005120,
+ "wall_clock_trained_s": 4344.5,
+ "created_at": "2026-11-19T12:28:34Z",
+ "files": [
+  {
+   "path": "model.npz",
+   "sha256": "73928c773edb57552044d3303ae0be9f106d26a518afeca15f95196a90c080f6",
+   "size": 1421124
+  },
+  {
+   "path": "state.json",
+   "sha256": "9bba3c7b4ec8fa0a5c2d8eb353974d1b6c8ce68e1167e1e7085a5a3c276615cf",
+   "size": 2706
+  }
+ ],
+ "config_hash": "sha256:733c203766709c289eb4a5da932e29d90735d1e30927670853c875bd3eadbd7f",
+ "world_spec_version": "3.0.0",
+ "code_commit": "2d1486d",
+ "code_dirty": false,
+ "dependencies": {
+  "python": "3.11.18",
+  "numpy": "2.4.6"
+ },
+ "verified": true,
+ "last_known_good": "gen6-food-s2/0046006272",
+ "milestones": [
+  "best"
+ ],
+ "eval_summary": {
+  "suite": "heldout-standard",
+  "step": 48005120,
+  "score": 1178.06,
+  "score_ci95": [
+   1094.6058,
+   1261.5142
+  ],
+  "food_mean": 23.53,
+  "survived": 0.51,
+  "caught": 0.34,
+  "shelter_when_threat": 0.034,
+  "hazard": 2.45,
+  "episodes": 100
+ }
+}

@@ -1,0 +1,1122 @@
+{
+ "schema": "genesis.familyeval/1",
+ "generated_at": "2026-11-19T12:43:08Z",
+ "conditions": "cloud/conditions.json",
+ "episodes_per_run_family": 100,
+ "seeds": "fresh held-out block: eval_seed_base + family offset + 50000..50099; best checkpoints were selected on block 0..99",
+ "runs": {
+  "gen6-food-s1": {
+   "checkpoint": "gen6-food-s1/0020021248",
+   "arm": "gen6-food"
+  },
+  "gen6-life-s1": {
+   "checkpoint": "gen6-life-s1/0030015488",
+   "arm": "gen6-life"
+  },
+  "gen6-food-s2": {
+   "checkpoint": "gen6-food-s2/0048005120",
+   "arm": "gen6-food"
+  },
+  "gen6-life-s2": {
+   "checkpoint": "gen6-life-s2/0034013184",
+   "arm": "gen6-life"
+  },
+  "gen6-food-s3": {
+   "checkpoint": "gen6-food-s3/0050003968",
+   "arm": "gen6-food"
+  },
+  "gen6-life-s3": {
+   "checkpoint": "gen6-life-s3/0040009728",
+   "arm": "gen6-life"
+  },
+  "gen6-food-s4": {
+   "checkpoint": "gen6-food-s4/0028016640",
+   "arm": "gen6-food"
+  },
+  "gen6-life-s4": {
+   "checkpoint": "gen6-life-s4/0034013184",
+   "arm": "gen6-life"
+  }
+ },
+ "arms": {
+  "gen6-food": {
+   "standard": {
+    "ticks": {
+     "mean": 1064.0775,
+     "ci95": [
+      1016.5311,
+      1111.6239
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.3875,
+     "ci95": [
+      0.3397,
+      0.4353
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 21.5275,
+     "ci95": [
+      20.1972,
+      22.8578
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0322,
+     "ci95": [
+      0.0252,
+      0.0391
+     ],
+     "n": 366
+    },
+    "dash_when_threat": {
+     "mean": 0.182,
+     "ci95": [
+      0.1698,
+      0.1942
+     ],
+     "n": 366
+    },
+    "survived": {
+     "mean": 0.45,
+     "ci95": [
+      0.4012,
+      0.4988
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "relentless": {
+    "ticks": {
+     "mean": 785.4475,
+     "ci95": [
+      741.2934,
+      829.6016
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.755,
+     "ci95": [
+      0.7128,
+      0.7972
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 15.9975,
+     "ci95": [
+      14.8951,
+      17.0999
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0331,
+     "ci95": [
+      0.0277,
+      0.0385
+     ],
+     "n": 389
+    },
+    "dash_when_threat": {
+     "mean": 0.2221,
+     "ci95": [
+      0.2086,
+      0.2356
+     ],
+     "n": 389
+    },
+    "survived": {
+     "mean": 0.1525,
+     "ci95": [
+      0.1172,
+      0.1878
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "night": {
+    "ticks": {
+     "mean": 1122.2625,
+     "ci95": [
+      1079.1844,
+      1165.3406
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.375,
+     "ci95": [
+      0.3275,
+      0.4225
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 22.7425,
+     "ci95": [
+      21.5418,
+      23.9432
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0321,
+     "ci95": [
+      0.0261,
+      0.0382
+     ],
+     "n": 356
+    },
+    "dash_when_threat": {
+     "mean": 0.1888,
+     "ci95": [
+      0.1754,
+      0.2021
+     ],
+     "n": 356
+    },
+    "survived": {
+     "mean": 0.445,
+     "ci95": [
+      0.3962,
+      0.4938
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "drought": {
+    "ticks": {
+     "mean": 1019.7,
+     "ci95": [
+      972.8011,
+      1066.5989
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.4375,
+     "ci95": [
+      0.3888,
+      0.4862
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 19.585,
+     "ci95": [
+      18.3481,
+      20.8219
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0213,
+     "ci95": [
+      0.0158,
+      0.0269
+     ],
+     "n": 358
+    },
+    "dash_when_threat": {
+     "mean": 0.1712,
+     "ci95": [
+      0.1596,
+      0.1829
+     ],
+     "n": 358
+    },
+    "survived": {
+     "mean": 0.3825,
+     "ci95": [
+      0.3348,
+      0.4302
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "fissure_heavy": {
+    "ticks": {
+     "mean": 1016.1575,
+     "ci95": [
+      967.6969,
+      1064.6181
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.4175,
+     "ci95": [
+      0.3691,
+      0.4659
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 19.935,
+     "ci95": [
+      18.6834,
+      21.1866
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0377,
+     "ci95": [
+      0.0311,
+      0.0443
+     ],
+     "n": 372
+    },
+    "dash_when_threat": {
+     "mean": 0.1868,
+     "ci95": [
+      0.1758,
+      0.1977
+     ],
+     "n": 372
+    },
+    "survived": {
+     "mean": 0.4175,
+     "ci95": [
+      0.3691,
+      0.4659
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "lure_heavy": {
+    "ticks": {
+     "mean": 854.725,
+     "ci95": [
+      810.9726,
+      898.4774
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.615,
+     "ci95": [
+      0.5673,
+      0.6627
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 15.55,
+     "ci95": [
+      14.5396,
+      16.5604
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0392,
+     "ci95": [
+      0.0336,
+      0.0449
+     ],
+     "n": 396
+    },
+    "dash_when_threat": {
+     "mean": 0.1685,
+     "ci95": [
+      0.1594,
+      0.1776
+     ],
+     "n": 396
+    },
+    "survived": {
+     "mean": 0.19,
+     "ci95": [
+      0.1515,
+      0.2285
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "one_shelter": {
+    "ticks": {
+     "mean": 955.2575,
+     "ci95": [
+      908.3406,
+      1002.1744
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.465,
+     "ci95": [
+      0.4161,
+      0.5139
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 13.785,
+     "ci95": [
+      12.8328,
+      14.7372
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.013,
+     "ci95": [
+      0.0091,
+      0.0169
+     ],
+     "n": 369
+    },
+    "dash_when_threat": {
+     "mean": 0.1957,
+     "ci95": [
+      0.1827,
+      0.2087
+     ],
+     "n": 369
+    },
+    "survived": {
+     "mean": 0.3075,
+     "ci95": [
+      0.2622,
+      0.3528
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "unseen_layout": {
+    "ticks": {
+     "mean": 964.1675,
+     "ci95": [
+      916.4196,
+      1011.9154
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.4225,
+     "ci95": [
+      0.374,
+      0.471
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 19.8675,
+     "ci95": [
+      18.455,
+      21.28
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0348,
+     "ci95": [
+      0.0263,
+      0.0433
+     ],
+     "n": 357
+    },
+    "dash_when_threat": {
+     "mean": 0.2041,
+     "ci95": [
+      0.1913,
+      0.217
+     ],
+     "n": 357
+    },
+    "survived": {
+     "mean": 0.3375,
+     "ci95": [
+      0.2911,
+      0.3839
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "perturbed": {
+    "ticks": {
+     "mean": 959.315,
+     "ci95": [
+      915.5268,
+      1003.1032
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.56,
+     "ci95": [
+      0.5113,
+      0.6087
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 17.935,
+     "ci95": [
+      16.8648,
+      19.0052
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0388,
+     "ci95": [
+      0.0332,
+      0.0445
+     ],
+     "n": 398
+    },
+    "dash_when_threat": {
+     "mean": 0.1642,
+     "ci95": [
+      0.1548,
+      0.1735
+     ],
+     "n": 398
+    },
+    "survived": {
+     "mean": 0.2675,
+     "ci95": [
+      0.2241,
+      0.3109
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "no_predator": {
+    "ticks": {
+     "mean": 1445.66,
+     "ci95": [
+      1423.2821,
+      1468.0379
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 36.475,
+     "ci95": [
+      35.2371,
+      37.7129
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": null,
+    "dash_when_threat": null,
+    "survived": {
+     "mean": 0.935,
+     "ci95": [
+      0.9108,
+      0.9592
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   }
+  },
+  "gen6-life": {
+   "standard": {
+    "ticks": {
+     "mean": 1235.3,
+     "ci95": [
+      1193.9186,
+      1276.6814
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.13,
+     "ci95": [
+      0.097,
+      0.163
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 18.435,
+     "ci95": [
+      17.5224,
+      19.3476
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0419,
+     "ci95": [
+      0.0347,
+      0.0492
+     ],
+     "n": 353
+    },
+    "dash_when_threat": {
+     "mean": 0.203,
+     "ci95": [
+      0.1901,
+      0.2159
+     ],
+     "n": 353
+    },
+    "survived": {
+     "mean": 0.6425,
+     "ci95": [
+      0.5955,
+      0.6895
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "relentless": {
+    "ticks": {
+     "mean": 1093.2,
+     "ci95": [
+      1049.706,
+      1136.694
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.36,
+     "ci95": [
+      0.3129,
+      0.4071
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 15.9375,
+     "ci95": [
+      15.0575,
+      16.8175
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0372,
+     "ci95": [
+      0.0319,
+      0.0425
+     ],
+     "n": 390
+    },
+    "dash_when_threat": {
+     "mean": 0.2227,
+     "ci95": [
+      0.2089,
+      0.2364
+     ],
+     "n": 390
+    },
+    "survived": {
+     "mean": 0.4225,
+     "ci95": [
+      0.374,
+      0.471
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "night": {
+    "ticks": {
+     "mean": 1273.27,
+     "ci95": [
+      1234.331,
+      1312.209
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.12,
+     "ci95": [
+      0.0881,
+      0.1519
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 19.32,
+     "ci95": [
+      18.461,
+      20.179
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.042,
+     "ci95": [
+      0.034,
+      0.0499
+     ],
+     "n": 361
+    },
+    "dash_when_threat": {
+     "mean": 0.1866,
+     "ci95": [
+      0.175,
+      0.1982
+     ],
+     "n": 361
+    },
+    "survived": {
+     "mean": 0.6825,
+     "ci95": [
+      0.6368,
+      0.7282
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "drought": {
+    "ticks": {
+     "mean": 1176.0625,
+     "ci95": [
+      1133.4264,
+      1218.6986
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.1725,
+     "ci95": [
+      0.1354,
+      0.2096
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 16.7325,
+     "ci95": [
+      15.8104,
+      17.6546
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0187,
+     "ci95": [
+      0.0145,
+      0.0229
+     ],
+     "n": 357
+    },
+    "dash_when_threat": {
+     "mean": 0.1932,
+     "ci95": [
+      0.1816,
+      0.2048
+     ],
+     "n": 357
+    },
+    "survived": {
+     "mean": 0.5525,
+     "ci95": [
+      0.5037,
+      0.6013
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "fissure_heavy": {
+    "ticks": {
+     "mean": 1156.335,
+     "ci95": [
+      1111.5621,
+      1201.1079
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.1625,
+     "ci95": [
+      0.1263,
+      0.1987
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 16.5675,
+     "ci95": [
+      15.6085,
+      17.5265
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0358,
+     "ci95": [
+      0.0301,
+      0.0415
+     ],
+     "n": 370
+    },
+    "dash_when_threat": {
+     "mean": 0.2124,
+     "ci95": [
+      0.1988,
+      0.226
+     ],
+     "n": 370
+    },
+    "survived": {
+     "mean": 0.55,
+     "ci95": [
+      0.5012,
+      0.5988
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "lure_heavy": {
+    "ticks": {
+     "mean": 1135.0275,
+     "ci95": [
+      1093.2271,
+      1176.8279
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.2775,
+     "ci95": [
+      0.2336,
+      0.3214
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 15.56,
+     "ci95": [
+      14.7451,
+      16.3749
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0367,
+     "ci95": [
+      0.0326,
+      0.0407
+     ],
+     "n": 396
+    },
+    "dash_when_threat": {
+     "mean": 0.1759,
+     "ci95": [
+      0.1672,
+      0.1845
+     ],
+     "n": 396
+    },
+    "survived": {
+     "mean": 0.4475,
+     "ci95": [
+      0.3987,
+      0.4963
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "one_shelter": {
+    "ticks": {
+     "mean": 1108.56,
+     "ci95": [
+      1065.221,
+      1151.899
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.1725,
+     "ci95": [
+      0.1354,
+      0.2096
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 12.5175,
+     "ci95": [
+      11.7759,
+      13.2591
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0138,
+     "ci95": [
+      0.01,
+      0.0175
+     ],
+     "n": 361
+    },
+    "dash_when_threat": {
+     "mean": 0.2067,
+     "ci95": [
+      0.1951,
+      0.2182
+     ],
+     "n": 361
+    },
+    "survived": {
+     "mean": 0.4375,
+     "ci95": [
+      0.3888,
+      0.4862
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "unseen_layout": {
+    "ticks": {
+     "mean": 1098.745,
+     "ci95": [
+      1052.6282,
+      1144.8618
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.2125,
+     "ci95": [
+      0.1724,
+      0.2526
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 16.3475,
+     "ci95": [
+      15.3187,
+      17.3763
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0325,
+     "ci95": [
+      0.0265,
+      0.0385
+     ],
+     "n": 347
+    },
+    "dash_when_threat": {
+     "mean": 0.2218,
+     "ci95": [
+      0.2078,
+      0.2359
+     ],
+     "n": 347
+    },
+    "survived": {
+     "mean": 0.47,
+     "ci95": [
+      0.421,
+      0.519
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "perturbed": {
+    "ticks": {
+     "mean": 1184.435,
+     "ci95": [
+      1144.0838,
+      1224.7862
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.2625,
+     "ci95": [
+      0.2193,
+      0.3057
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 16.3225,
+     "ci95": [
+      15.5311,
+      17.1139
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": {
+     "mean": 0.0431,
+     "ci95": [
+      0.0381,
+      0.0481
+     ],
+     "n": 391
+    },
+    "dash_when_threat": {
+     "mean": 0.1799,
+     "ci95": [
+      0.1705,
+      0.1893
+     ],
+     "n": 391
+    },
+    "survived": {
+     "mean": 0.4975,
+     "ci95": [
+      0.4484,
+      0.5466
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   },
+   "no_predator": {
+    "ticks": {
+     "mean": 1443.8625,
+     "ci95": [
+      1421.4521,
+      1466.2729
+     ],
+     "n": 400
+    },
+    "caught": {
+     "mean": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ],
+     "n": 400
+    },
+    "food": {
+     "mean": 27.5175,
+     "ci95": [
+      26.6998,
+      28.3352
+     ],
+     "n": 400
+    },
+    "shelter_when_threat": null,
+    "dash_when_threat": null,
+    "survived": {
+     "mean": 0.9275,
+     "ci95": [
+      0.9021,
+      0.9529
+     ],
+     "n": 400
+    },
+    "seeds": 4,
+    "episodes": 400
+   }
+  }
+ },
+ "comparisons": [
+  {
+   "family": "standard",
+   "gen6-food": 1064.0775,
+   "gen6-life": 1235.3,
+   "separated": true
+  },
+  {
+   "family": "relentless",
+   "gen6-food": 785.4475,
+   "gen6-life": 1093.2,
+   "separated": true
+  },
+  {
+   "family": "night",
+   "gen6-food": 1122.2625,
+   "gen6-life": 1273.27,
+   "separated": true
+  },
+  {
+   "family": "drought",
+   "gen6-food": 1019.7,
+   "gen6-life": 1176.0625,
+   "separated": true
+  },
+  {
+   "family": "fissure_heavy",
+   "gen6-food": 1016.1575,
+   "gen6-life": 1156.335,
+   "separated": true
+  },
+  {
+   "family": "lure_heavy",
+   "gen6-food": 854.725,
+   "gen6-life": 1135.0275,
+   "separated": true
+  },
+  {
+   "family": "one_shelter",
+   "gen6-food": 955.2575,
+   "gen6-life": 1108.56,
+   "separated": true
+  },
+  {
+   "family": "unseen_layout",
+   "gen6-food": 964.1675,
+   "gen6-life": 1098.745,
+   "separated": true
+  },
+  {
+   "family": "perturbed",
+   "gen6-food": 959.315,
+   "gen6-life": 1184.435,
+   "separated": true
+  },
+  {
+   "family": "no_predator",
+   "gen6-food": 1445.66,
+   "gen6-life": 1443.8625,
+   "separated": false
+  }
+ ],
+ "wall_seconds": 152
+}

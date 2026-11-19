@@ -433,6 +433,7 @@ function interpretBehavior(obs, probs) {
   else if (threat) label = "Alert";
   else if (world.resting) label = "Resting";
   else if (b.idleT > 0.6 && ent > 1.4) label = "Hesitating";
+  else if (cur.action === 6) label = threat ? "Creeping past danger" : "Creeping";  // the learned stealth: slow movement shrinks the predator's detection range
   else if (b.closing >= 3) label = "Nearing seed";
   else if (world.v > 0.02) label = world.energy < 0.25 ? "Searching, hungry" : seesFood ? "Foraging" : "Exploring";
   else label = "Still";
@@ -560,7 +561,7 @@ function render(dt, t, a) {
   velaRoot.rotation.y = yaw;
   const threat = behave.threatT > 0.2;
   const breath = reduceMotion ? 0 : Math.sin(t * Math.PI * 2 / (threat ? 1.1 : s.resting ? 3.6 : 2.8)) * (s.resting ? 0.03 : 0.02);
-  const crouch = s.resting ? 0.82 : s.inShelter && threat ? 0.78 : threat && s.v < 0.07 ? 0.88 : 1;
+  const crouch = s.resting ? 0.82 : s.inShelter && threat ? 0.78 : s.action === 6 ? 0.84 : threat && s.v < 0.07 ? 0.88 : 1;  // creeping: low and flat
   if (dying) {
     // the end, driven by the real cause: caught → struck, tips and is still; starved → weakens, breath slows, settles
     const k = clamp((clock.elapsedTime - dying.t0) / (dying.cause === "caught" ? 0.6 : 2.6), 0, 1), ease = 1 - Math.pow(1 - k, 3);

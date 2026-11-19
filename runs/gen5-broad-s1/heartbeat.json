@@ -1,0 +1,20 @@
+{
+ "run_id": "gen5-broad-s1",
+ "host_id": "vm",
+ "session_id": "be01a4d2",
+ "pid": 300,
+ "global_step": 50003968,
+ "wall_time_s": 4316.7,
+ "updated_at": "2026-11-19T10:27:56Z",
+ "updated_ts": 1795084076.5866554,
+ "last_local_ckpt": "gen5-broad-s1/0050003968",
+ "last_local_ckpt_ts": 1795084076.5442495,
+ "last_remote_publish": {
+  "checkpoint_id": "gen5-broad-s1/0046006272",
+  "commit": "9d06a2e9a6da5a5b43d63dc4c4bc59c69b99979d",
+  "published_at": "2026-11-19T10:22:15Z"
+ },
+ "steps_per_sec": 12750,
+ "rss_mb": 52.1,
+ "segment_index": 2
+}

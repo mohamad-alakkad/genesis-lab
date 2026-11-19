@@ -1,0 +1,35 @@
+{
+ "schema": "genesis.manifest/1",
+ "run_id": "gen5-std-s3",
+ "checkpoint_id": "gen5-std-s3/0050003968",
+ "parent": null,
+ "global_step": 50003968,
+ "wall_clock_trained_s": 4422.9,
+ "created_at": "2026-11-19T10:22:32Z",
+ "files": [
+  {
+   "path": "model.npz",
+   "sha256": "8f782f497c91ff4af361f145c59b87202f0598be277633361b4089a9396a1384",
+   "size": 1421124
+  },
+  {
+   "path": "state.json",
+   "sha256": "c2d4d3cb62bd5cb52e9530f9226b52dd04d08ddd9a1e0dbbaeccad58a93486f0",
+   "size": 2729
+  }
+ ],
+ "config_hash": "sha256:97683ab6ce1981b76cd19c1b702869d54f43b09c3ae2cd9722945f58ea6117d2",
+ "world_spec_version": "3.0.0",
+ "code_commit": "066d1da",
+ "code_dirty": false,
+ "dependencies": {
+  "python": "3.11.18",
+  "numpy": "2.4.6"
+ },
+ "verified": true,
+ "last_known_good": "gen5-std-s3/0050003968",
+ "milestones": [
+  "final"
+ ],
+ "eval_summary": null
+}

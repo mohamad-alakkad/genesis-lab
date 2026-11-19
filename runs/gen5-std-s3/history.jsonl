@@ -1,0 +1,4 @@
+{"segment": 1, "event": "start", "host_id": "vm", "pid": 346, "start": "2026-11-19T08:49:57Z", "steps_start": 0, "recovered_from": "gen5-std-s3/0000000000", "prev_end": null}
+{"segment": 1, "event": "end", "end": "2026-11-19T09:35:04Z", "end_reason": "segment_done", "end_confirmed": true, "steps_start": 0, "steps_end": 27721728, "lost_time_s": 0, "peak_rss_mb": 102.5, "checkpoint": "gen5-std-s3/0027721728"}
+{"segment": 2, "event": "start", "host_id": "vm", "pid": 306, "start": "2026-11-19T09:50:25Z", "steps_start": 27721728, "recovered_from": "gen5-std-s3/0027721728", "prev_end": {"reason": "segment_done", "confirmed": true, "lost_time_s": 0.0}}
+{"segment": 2, "event": "end", "end": "2026-11-19T10:22:32Z", "end_reason": "budget_exhausted", "end_confirmed": true, "steps_start": 27721728, "steps_end": 50003968, "lost_time_s": 0, "peak_rss_mb": 119.0, "checkpoint": "gen5-std-s3/0050003968"}

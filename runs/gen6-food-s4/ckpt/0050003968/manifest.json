@@ -1,0 +1,35 @@
+{
+ "schema": "genesis.manifest/1",
+ "run_id": "gen6-food-s4",
+ "checkpoint_id": "gen6-food-s4/0050003968",
+ "parent": null,
+ "global_step": 50003968,
+ "wall_clock_trained_s": 4519.0,
+ "created_at": "2026-11-19T12:31:43Z",
+ "files": [
+  {
+   "path": "model.npz",
+   "sha256": "98a24a2de9999737b1bd49675c637f78ff638572f73379cbe39ad0f91dcb2eb8",
+   "size": 1421124
+  },
+  {
+   "path": "state.json",
+   "sha256": "4d16b5197b1031b46cf23a0d34435f87e5f22cb105e521c4cc827f9f07261b93",
+   "size": 2788
+  }
+ ],
+ "config_hash": "sha256:ba5a47d4d4d828fe1ce3d8f300b6ea288967bbc2680a3c4198b8ee64e8984965",
+ "world_spec_version": "3.0.0",
+ "code_commit": "2d1486d",
+ "code_dirty": false,
+ "dependencies": {
+  "python": "3.11.18",
+  "numpy": "2.4.6"
+ },
+ "verified": true,
+ "last_known_good": "gen6-food-s4/0050003968",
+ "milestones": [
+  "final"
+ ],
+ "eval_summary": null
+}

@@ -1,0 +1,20 @@
+{
+ "run_id": "gen6-food-s4",
+ "host_id": "vm",
+ "session_id": "feb855ea",
+ "pid": 316,
+ "global_step": 50003968,
+ "wall_time_s": 4519.0,
+ "updated_at": "2026-11-19T12:31:43Z",
+ "updated_ts": 1795091503.6440716,
+ "last_local_ckpt": "gen6-food-s4/0050003968",
+ "last_local_ckpt_ts": 1795091503.5888867,
+ "last_remote_publish": {
+  "checkpoint_id": "gen6-food-s4/0048005120",
+  "commit": "bc1f0b4720ba087a5bed9f385db59577d16f33f3",
+  "published_at": "2026-11-19T12:30:20Z"
+ },
+ "steps_per_sec": 12550,
+ "rss_mb": 49.8,
+ "segment_index": 2
+}

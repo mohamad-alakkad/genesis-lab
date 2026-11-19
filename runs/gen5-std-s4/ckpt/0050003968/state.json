@@ -1,0 +1,163 @@
+{
+ "global_step": 50003968,
+ "episodes": 49471,
+ "segments": 2,
+ "wall_trained_s": 4408.140276193619,
+ "updates": 1526,
+ "best": {
+  "suite": "heldout-standard",
+  "step": 18022400,
+  "score": 1144.61,
+  "score_ci95": [
+   1062.8985,
+   1226.3215
+  ],
+  "food_mean": 22.31,
+  "survived": 0.44,
+  "caught": 0.45,
+  "shelter_when_threat": 0.0229,
+  "hazard": 2.59,
+  "episodes": 100,
+  "checkpoint_id": "gen5-std-s4/0018022400"
+ },
+ "evals": 26,
+ "since_best": 16,
+ "consec_target": 0,
+ "init_seed": 4,
+ "interruptions": 0,
+ "lost_time_s": 0.0,
+ "milestones_done": [
+  "step0",
+  "early",
+  "middle"
+ ],
+ "eval_latest": {
+  "suite": "heldout-standard",
+  "step": 50003968,
+  "score": 1085.51,
+  "score_ci95": [
+   994.0299,
+   1176.9901
+  ],
+  "food_mean": 21.87,
+  "survived": 0.44,
+  "caught": 0.38,
+  "shelter_when_threat": 0.0427,
+  "hazard": 1.65,
+  "episodes": 100
+ },
+ "ckpt_overhead_s": 1.7441372871398926,
+ "last_publish": {
+  "checkpoint_id": "gen5-std-s4/0044007424",
+  "commit": "eab27c412452d76f7a2a1e7525a9f5db6c99fa29",
+  "published_at": "2026-11-19T10:14:45Z"
+ },
+ "prev_end_reason": "segment_done",
+ "terminal": {
+  "state": "budget_exhausted",
+  "reason": "budget_exhausted"
+ },
+ "config": {
+  "n_envs": 256,
+  "n_steps": 128,
+  "epochs": 4,
+  "minibatch": 2048,
+  "lr": 0.0003,
+  "gamma": 0.997,
+  "lam": 0.95,
+  "clip": 0.2,
+  "ent_coef": 0.01,
+  "vf_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "hidden": [
+   128,
+   128
+  ],
+  "total_steps": 50000000,
+  "segment_minutes": 45.0,
+  "ckpt_minutes": 4,
+  "first_ckpt_s": 45,
+  "publish_minutes": 8,
+  "heartbeat_s": 30,
+  "eval_every_steps": 2000000,
+  "eval_episodes": 100,
+  "target_survival": 0.9,
+  "plateau_evals": 1000,
+  "plateau_eps": 15.0,
+  "seed": 4,
+  "rss_soft_mb": 1400,
+  "rss_hard_mb": 1600,
+  "host_min_avail_frac": 0.1,
+  "milestone_steps": {
+   "early": 2000000
+  },
+  "obs_mask": [],
+  "train_family": "train"
+ },
+ "rng": {
+  "seed": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 10430536422242254436180717988706794602,
+    "inc": 87209435796639942783298437561837911585
+   },
+   "has_uint32": 0,
+   "uinteger": 1331991345
+  },
+  "act": {
+   "bit_generator": "PCG64",
+   "state": {
+    "state": 155188352574093753887877902157602132980,
+    "inc": 282049856699571962369303454728139306705
+   },
+   "has_uint32": 0,
+   "uinteger": 259281508
+  }
+ },
+ "adam_t": 97664,
+ "norm_count": 50003968.0001,
+ "arch": {
+  "pi.W0": [
+   95,
+   128
+  ],
+  "pi.W1": [
+   128,
+   128
+  ],
+  "pi.W2": [
+   128,
+   8
+  ],
+  "pi.b0": [
+   128
+  ],
+  "pi.b1": [
+   128
+  ],
+  "pi.b2": [
+   8
+  ],
+  "v.W0": [
+   95,
+   128
+  ],
+  "v.W1": [
+   128,
+   128
+  ],
+  "v.W2": [
+   128,
+   1
+  ],
+  "v.b0": [
+   128
+  ],
+  "v.b1": [
+   128
+  ],
+  "v.b2": [
+   1
+  ]
+ }
+}

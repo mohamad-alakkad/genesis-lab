@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
     "publish_minutes": 30, "heartbeat_s": 30, "eval_every_steps": 2_000_000, "eval_episodes": 100,
     "target_survival": 0.9, "plateau_evals": 10, "plateau_eps": 15.0, "seed": 1,
     "rss_soft_mb": 1400, "rss_hard_mb": 1600, "host_min_avail_frac": 0.10,
-    "milestone_steps": {"early": 2_000_000}, "obs_mask": [], "train_family": "train",
+    "milestone_steps": {"early": 2_000_000}, "obs_mask": [], "train_family": "train", "reward_mode": "food", "life_reward": 0.01,
 }
 
 
@@ -249,6 +249,8 @@ class Trainer:
                 a = (lp + g).argmax(1)
                 v = ppo.mlp_forward(self.params, "v", x)[0][:, 0]
                 obs2, r, dead, trunc, info = self.env.step(a)
+                if cfg.get("reward_mode", "food") == "life":  # objective = staying alive: +life_reward per tick survived, nothing else
+                    r = np.where(dead, 0.0, cfg.get("life_reward", 0.01))
                 b_obs[t] = x; b_act[t] = a; b_logp[t] = lp[np.arange(E), a]; b_rew[t] = r; b_val[t] = v
                 b_done[t] = dead
                 if trunc.any():  # bootstrap truncated episodes with the value of the terminal-ish state

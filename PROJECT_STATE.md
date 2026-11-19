@@ -1,8 +1,8 @@
 # GENESIS — Project state
 
-**Updated:** 2026-11-19 08:45Z · **Phase:** GENESIS 1.0 track — world 3.0.0 done; gen5 training (broad vs standard predator speeds); report draft docs/REPORT.md
-**Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (gen4-mem-g997-s1 best 28.0M default; world 2.2.0; Worker version 857ddc78)
-**Next action:** when all 8 gen5 runs are `budget_exhausted`: `python -m genesis.experiment cloud/conditions.json 200 50000` (+ per-family eval incl. relentless/drought/fissure_heavy) → verdict → deploy best gen5 brain on world 3.0.0 site; then visitor 'Invisible Hand' UI
+**Updated:** 2026-11-19 13:05Z · **Phase:** GENESIS 1.0 track — world 3.0.0 live with gen6 life-reward brain; report covers gen1–gen6
+**Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (world 3.0.0, gen6-life-s1 best) · staging: https://genesis-staging-3b9a70614d.dentexa-com.workers.dev · deploy: `bash web/deploy.sh <worker> web/public/policies`
+**Next action:** next research question = can shelter use emerge where stealth fails (e.g. scent tracking)? candidates in docs/DECISIONS.md; experience polish (sound listening by the user, creature anatomy close-up camera)
 
 ## Commands
 - CLI: `python -m genesis <train|resume|stop|status [--remote branches]|evaluate|export|diagnose|publish|fetch>`
@@ -36,11 +36,8 @@
 - [ ] MVP checklist
 
 ## Cloud runs in flight
-| trigger | what | schedule |
-|---|---|---|
-| trig_01WshMDVj5EGSv1gd6EpsKfE | gen5 arm C: train_broad (predator 0.10–0.17), seeds 1–4 (C1–C4) | hourly :57 from 08:57Z |
-| trig_017M19mXuACfto4d9UDVraiK | gen5 arm D: standard range, seeds 1–4 (D1–D4) | hourly :49 from 08:49Z |
-50M steps each, γ 0.997, memory on, world 3.0.0. Disable both when all 8 report budget_exhausted.
+- None. Training triggers disabled (trig_01WshMDVj5EGSv1gd6EpsKfE, trig_017M19mXuACfto4d9UDVraiK); one-shot evaluator trig_0188ABQ8EoN8dC9o8WLooKft (re-point prompt + run for the next generation).
+- Results: gen4 docs/reports/gen4-results.*, gen5 docs/reports/gen5-families.*, gen6 docs/reports/gen6-families.* (fresh seeds, 10 families). Experiment registry: cloud/experiments/gen*.json.
 
 ## Open problems / questions for the user
 - gen2 learning flattening at ~750 survival ticks (survivor baseline 711), caught ≈ 0.7: diagnose after 60M (next-change ladder: observation/reward audit before hyperparameters)

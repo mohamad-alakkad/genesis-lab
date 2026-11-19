@@ -1,0 +1,20 @@
+{
+ "run_id": "gen6-life-s3",
+ "host_id": "vm",
+ "session_id": "8bf1fe17",
+ "pid": 301,
+ "global_step": 50003968,
+ "wall_time_s": 4728.4,
+ "updated_at": "2026-11-19T12:27:48Z",
+ "updated_ts": 1795091268.8382616,
+ "last_local_ckpt": "gen6-life-s3/0050003968",
+ "last_local_ckpt_ts": 1795091268.7772715,
+ "last_remote_publish": {
+  "checkpoint_id": "gen6-life-s3/0046006272",
+  "commit": "80ed2e49b5928da97b8421ef98f286fe613b2a34",
+  "published_at": "2026-11-19T12:22:45Z"
+ },
+ "steps_per_sec": 10717,
+ "rss_mb": 97.7,
+ "segment_index": 2
+}

@@ -1,8 +1,8 @@
 # GENESIS — Project state
 
-**Updated:** 2026-11-18 21:55Z · **Phase:** gen4 done (horizon is the key; evasion learned, not hiding) · site on gen4 brain, world 2.2.0
+**Updated:** 2026-11-19 08:45Z · **Phase:** GENESIS 1.0 track — world 3.0.0 done; gen5 training (broad vs standard predator speeds); report draft docs/REPORT.md
 **Preview:** https://genesis-preview-3b416cc0d8.dentexa-com.workers.dev (gen4-mem-g997-s1 best 28.0M default; world 2.2.0; Worker version 857ddc78)
-**Next action:** decide gen5 direction from the open problem (hiding not learned; oracle shows early hiding → 17% capture): candidates in docs/DECISIONS.md
+**Next action:** when all 8 gen5 runs are `budget_exhausted`: `python -m genesis.experiment cloud/conditions.json 200 50000` (+ per-family eval incl. relentless/drought/fissure_heavy) → verdict → deploy best gen5 brain on world 3.0.0 site; then visitor 'Invisible Hand' UI
 
 ## Commands
 - CLI: `python -m genesis <train|resume|stop|status [--remote branches]|evaluate|export|diagnose|publish|fetch>`
@@ -36,8 +36,11 @@
 - [ ] MVP checklist
 
 ## Cloud runs in flight
-- None. Both gen4 triggers disabled 21:18Z (trig_01WshMDVj5EGSv1gd6EpsKfE, trig_017M19mXuACfto4d9UDVraiK).
-- Results: docs/reports/gen4-results.json/.md (fresh seeds 3e9+50000.., 200 episodes per checkpoint). Best arms ≈1060–1074 ticks, caught ≈36% (gen3 689/78%, survivor 724/60%, oracle 1069/17%).
+| trigger | what | schedule |
+|---|---|---|
+| trig_01WshMDVj5EGSv1gd6EpsKfE | gen5 arm C: train_broad (predator 0.10–0.17), seeds 1–4 (C1–C4) | hourly :57 from 08:57Z |
+| trig_017M19mXuACfto4d9UDVraiK | gen5 arm D: standard range, seeds 1–4 (D1–D4) | hourly :49 from 08:49Z |
+50M steps each, γ 0.997, memory on, world 3.0.0. Disable both when all 8 report budget_exhausted.
 
 ## Open problems / questions for the user
 - gen2 learning flattening at ~750 survival ticks (survivor baseline 711), caught ≈ 0.7: diagnose after 60M (next-change ladder: observation/reward audit before hyperparameters)

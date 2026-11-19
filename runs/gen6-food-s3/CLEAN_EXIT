@@ -1,0 +1,8 @@
+{
+ "end_reason": "budget_exhausted",
+ "state": "budget_exhausted",
+ "step": 50003968,
+ "at": "2026-11-19T12:31:37Z",
+ "at_ts": 1795091497.0484946,
+ "checkpoint": "gen6-food-s3/0050003968"
+}

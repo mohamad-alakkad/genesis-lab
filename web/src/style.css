@@ -80,3 +80,10 @@ button#enter { margin-top: 10px; padding: 14px 28px; font-size: 14px; letter-spa
   .brand, .specimen, .tools, .gear, .rc-open { transition: opacity .35s; }
 }
 @media (prefers-reduced-motion: reduce) { .bar i, .state, .toast, .veil { transition: none; } }
+
+.motes { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 4px; }
+.motes i { display: block; width: 7px; height: 7px; border-radius: 50%; background: rgba(236,245,244,.15); transition: background .6s, box-shadow .6s; }
+.motes i.on { background: #c9bcff; box-shadow: 0 0 8px rgba(142,115,255,.8); }
+.tools button[data-tool="plant"] svg { stroke: var(--energy); } .tools button[data-tool="thicket"] svg { stroke: var(--life); }
+.tools button[data-tool="ground"] svg { stroke: var(--hazard); } .tools button[data-tool="lure"] svg { stroke: #c9bcff; }
+@media (max-width: 650px) { .motes { flex-direction: row; } .tools button span { display: none; } }

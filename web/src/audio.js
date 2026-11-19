@@ -148,6 +148,31 @@ export class Soundscape {
     e.gain.setValueAtTime(gain, t); e.gain.setTargetAtTime(0, t + 0.02, 0.18);
     o.connect(e).connect(p).connect(this.world); p.connect(this.verb); o.start(t); o.stop(t + 1.5);
   }
+  rumble(pan = 0, sec = 3.5) {  // the ground trembling before a fissure opens: felt more than heard
+    if (!this.enabled) return;
+    const ctx = this.ctx, t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), e = ctx.createGain(), p = ctx.createStereoPanner();
+    s.buffer = this.noise; s.playbackRate.value = 0.35; f.type = "lowpass"; f.frequency.value = 90; f.Q.value = 3;
+    p.pan.value = clamp(pan, -0.8, 0.8); e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(0.35, t + sec * 0.6); e.gain.linearRampToValueAtTime(0, t + sec);
+    const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 7; lg.gain.value = 0.12; lfo.connect(lg).connect(e.gain);
+    s.connect(f).connect(e).connect(p).connect(this.world); s.start(t, rnd(0, 3)); s.stop(t + sec + 0.1); lfo.start(t); lfo.stop(t + sec + 0.1);
+  }
+  crack(pan = 0) {  // the fissure opens
+    if (!this.enabled) return;
+    this.thud(pan, 38, 0.32);
+    const ctx = this.ctx, t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), e = ctx.createGain(), p = ctx.createStereoPanner();
+    s.buffer = this.noise; f.type = "bandpass"; f.frequency.value = 1400; f.Q.value = 0.8; p.pan.value = clamp(pan, -0.8, 0.8);
+    e.gain.setValueAtTime(0.25, t); e.gain.setTargetAtTime(0, t + 0.01, 0.06);
+    s.connect(f).connect(e).connect(p).connect(this.world); p.connect(this.verb); s.start(t, rnd(0, 3)); s.stop(t + 0.6);
+  }
+  rustle(pan = 0, sec = 2.5) {  // leaves unfolding as a thicket grows
+    if (!this.enabled) return;
+    const ctx = this.ctx, t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), e = ctx.createGain(), p = ctx.createStereoPanner();
+    s.buffer = this.noise; s.playbackRate.value = 1.7; f.type = "highpass"; f.frequency.value = 2600; p.pan.value = clamp(pan, -0.8, 0.8);
+    e.gain.setValueAtTime(0, t);
+    for (let i = 0; i < 6; i++) { const ti = t + i * sec / 6 + rnd(0, 0.15); e.gain.linearRampToValueAtTime(0.05 + rnd(0, 0.04), ti + 0.08); e.gain.linearRampToValueAtTime(0.01, ti + 0.3); }
+    e.gain.linearRampToValueAtTime(0, t + sec + 0.4);
+    s.connect(f).connect(e).connect(p).connect(this.world); s.start(t, rnd(0, 3)); s.stop(t + sec + 0.5);
+  }
   splash(pan = 0) {
     if (!this.enabled) return;
     const ctx = this.ctx, t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), e = ctx.createGain(), p = ctx.createStereoPanner();

@@ -50,13 +50,13 @@ const sun = new THREE.DirectionalLight(0xfff1dc, 1.6); sun.position.set(12, 18, 
 const velaGlow = new THREE.PointLight(pal.life, 0.9, 3.6, 1.4); scene.add(velaGlow);
 
 // ------------------------------------------------------------------ ground (procedural, extends beyond bounds)
-const groundU = { uTime: { value: 0 }, uLight: { value: 1 }, uRain: { value: 0 }, uMeadows: { value: [new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2()] },
+const groundU = { uTime: { value: 0 }, uLight: { value: 1 }, uRain: { value: 0 }, uMeadows: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
   uPools: { value: [new THREE.Vector3(-99, -99, 0), new THREE.Vector3(-99, -99, 0)] }, uBounds: { value: new THREE.Vector2(W / 2, H / 2) } };
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 70, 1, 1), new THREE.ShaderMaterial({
   uniforms: groundU, fog: false,
   vertexShader: `varying vec2 vP; void main(){ vec4 w = modelMatrix*vec4(position,1.); vP = w.xz; gl_Position = projectionMatrix*viewMatrix*w; }`,
   fragmentShader: `
-    uniform float uTime, uLight, uRain; uniform vec2 uMeadows[3]; uniform vec3 uPools[2]; uniform vec2 uBounds; varying vec2 vP;
+    uniform float uTime, uLight, uRain; uniform vec3 uMeadows[3]; uniform vec3 uPools[2]; uniform vec2 uBounds; varying vec2 vP;
     float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
     float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
     float fbm(vec2 p){ float s=0., a=.5; for(int i=0;i<5;i++){ s+=a*n(p); p*=2.03; a*=.5; } return s; }
@@ -64,7 +64,7 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 70, 1, 1), new THREE.S
       vec3 abyss=vec3(.027,.051,.09), ocean=vec3(.063,.176,.224), moss=vec3(.10,.22,.20), sand=vec3(.20,.24,.25);
       float f = fbm(vP*.35), g = fbm(vP*1.7+3.1);
       vec3 col = mix(ocean*0.8, sand*0.7, f*0.55) + (g-.5)*0.05;
-      float m = 0.; for(int i=0;i<3;i++){ m += smoothstep(3.2, 0.4, length(vP-uMeadows[i])); }
+      float m = 0.; for(int i=0;i<3;i++){ m += smoothstep(3.2, 0.4, length(vP-uMeadows[i].xy)) * (0.35 + 0.65 * uMeadows[i].z); }  // brighter where the meadow is fertile now
       col = mix(col, moss*1.25, clamp(m,0.,1.)*0.55);
       float wet = 0.;
       for(int i=0;i<2;i++){ float d = length(vP-uPools[i].xy)-uPools[i].z; wet = max(wet, smoothstep(0.8, 0., d)); }
@@ -104,7 +104,8 @@ function mulberry(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5
 // ------------------------------------------------------------------ world props (rebuilt per episode)
 const props = new THREE.Group(); scene.add(props);
 const slateMat = new THREE.MeshStandardMaterial({ color: 0x6b8794, roughness: 0.7, metalness: 0.05, flatShading: true });
-const frondMat = new THREE.MeshStandardMaterial({ color: 0x3f9a86, roughness: 0.55, side: THREE.DoubleSide, emissive: 0x124a42, emissiveIntensity: 0.5 });
+const FROND_HEALTHY = new THREE.Color(0x3f9a86), FROND_WILTED = new THREE.Color(0x8c7d55), _fc = new THREE.Color();
+const frondMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, side: THREE.DoubleSide, emissive: 0x124a42, emissiveIntensity: 0.5 });
 const waterMat = new THREE.ShaderMaterial({ transparent: true, uniforms: { uTime: groundU.uTime, uLight: groundU.uLight, uRain: groundU.uRain, uRipple: { value: new THREE.Vector4(0, 0, -10, 0) } },
   vertexShader: `varying vec2 vU; varying vec2 vW; void main(){ vU = uv; vec4 w = modelMatrix*vec4(position,1.); vW = w.xz; gl_Position = projectionMatrix*viewMatrix*w; }`,
   fragmentShader: `uniform float uTime,uLight,uRain; uniform vec4 uRipple; varying vec2 vU; varying vec2 vW;
@@ -132,7 +133,7 @@ function buildProps(world) {
   props.clear();
   view = { slates: [], seeds: [], vents: [], fronds: [], pools: [] };
   const rng = mulberry(world.seed ^ 0x9e3779b9);
-  world.meadows.forEach((m, i) => groundU.uMeadows.value[i].set(toX(m.x), toZ(m.y)));
+  world.meadows.forEach((m, i) => groundU.uMeadows.value[i].set(toX(m.x), toZ(m.y), 0.5));
   groundU.uPools.value.forEach((v) => v.set(-99, -99, 0));
   world.pools.forEach((p, i) => {
     if (!p.on) return;
@@ -142,23 +143,25 @@ function buildProps(world) {
   world.slates.forEach((o, j) => { view.slates[j] = null; if (o.on) addSlate(o, j, rng); });
   // thickets: many leaning fronds around each shelter circle; they part and sway (wind + Vela)
   const frondGeo = new THREE.PlaneGeometry(0.16, 1, 1, 4); frondGeo.translate(0, 0.5, 0);
-  const shelters = world.shelters.filter((s) => s.on);
-  const count = shelters.reduce((a, s) => a + Math.round(70 * s.r * s.r), 0);
+  const RAISED = C.max_shelters - 1, RAISED_N = Math.round(70 * C.raised_radius * C.raised_radius);
+  const count = world.shelters.reduce((a, s, i) => a + (i === RAISED ? RAISED_N : s.on ? Math.round(70 * s.r * s.r) : 0), 0);
   const inst = new THREE.InstancedMesh(frondGeo, frondMat, Math.max(count, 1));
   const base = [];
-  let k = 0;
-  for (const s of shelters) {
-    const n = Math.round(70 * s.r * s.r);
+  const scatter = (s, slot, n, rr) => { const out = [];
     for (let i = 0; i < n; i++) {
-      const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * s.r * 1.02;
-      const x = toX(s.x) + Math.cos(a) * r, z = toZ(s.y) + Math.sin(a) * r;
-      const hgt = 0.5 + rng() * 0.75 * (1 - 0.4 * r / s.r), lean = 0.25 + rng() * 0.35, yaw = rng() * Math.PI * 2;
-      base.push({ x, z, hgt, lean, yaw, ph: rng() * 6.28 }); k++;
-    }
+      const a = rr() * Math.PI * 2, r = Math.sqrt(rr()) * s.r * 1.02;
+      out.push({ slot, x: toX(s.x) + Math.cos(a) * r, z: toZ(s.y) + Math.sin(a) * r, hgt: 0.5 + rr() * 0.75 * (1 - 0.4 * r / s.r),
+        lean: 0.25 + rr() * 0.35, yaw: rr() * Math.PI * 2, ph: rr() * 6.28 }); }
+    return out; };
+  world.shelters.forEach((s, slot) => {
+    if (slot === RAISED) { for (let i = 0; i < RAISED_N; i++) base.push({ slot, x: 0, z: 0, hgt: 0, lean: 0, yaw: 0, ph: 0 }); return; }
+    if (!s.on) return;
+    base.push(...scatter(s, slot, Math.round(70 * s.r * s.r), rng));
     const sh = contactShadow(s.r * 2.6); sh.position.set(toX(s.x), 0.012, toZ(s.y)); sh.material.opacity = 0.7; props.add(sh);
-  }
-  inst.count = k; inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  view.fronds = { inst, base }; props.add(inst);
+  });
+  inst.count = base.length; inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  for (let i = 0; i < base.length; i++) inst.setColorAt(i, FROND_HEALTHY);
+  view.fronds = { inst, base, raisedKey: null, scatter, RAISED, RAISED_N }; props.add(inst);
   world.vents.forEach((v, i) => {
     if (!v.present) return;
     const g = new THREE.Group(); g.position.set(toX(v.x), 0, toZ(v.y));
@@ -188,6 +191,30 @@ function addSlate(o, j, rng = Math.random) {
   const sh = contactShadow(o.r * 2.8); sh.position.set(toX(o.x), 0.011, toZ(o.y)); props.add(sh);
   props.add(m); view.slates[j] = m;
 }
+
+// ------------------------------------------------------------------ ecology visuals (fissures, sprouts, lure ripples)
+const fissureMat = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uState: { value: 0 }, uTime: { value: 0 }, uProg: { value: 0 } },
+  vertexShader: `varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `uniform float uState, uTime, uProg; varying vec2 vU;
+    float h(float x){ return fract(sin(x*127.1)*43758.5453); }
+    void main(){ vec2 p = vU - .5; float r = length(p)*2., a = atan(p.y, p.x);
+      float k = floor((a + 3.1416) / 6.2832 * 9.); float jag = h(k) * .35;
+      float crack = smoothstep(.06, 0., abs(fract((a + 3.1416) / 6.2832 * 9.) - .5 - (r - .3) * jag)) * smoothstep(1., .2, r);
+      float pulse = .5 + .5 * sin(uTime * (6. + 10. * uProg));
+      vec3 ember = vec3(.95, .45, .3);
+      if (uState < 1.5) { float g = crack * uProg * (.35 + .65 * pulse); gl_FragColor = vec4(ember * g, g * .9); }
+      else { float core = smoothstep(.75, .55, r), rim = smoothstep(.95, .75, r) - core;
+        gl_FragColor = vec4(mix(vec3(.02, .01, .02), ember * (.8 + .4 * pulse), rim) + ember * crack * .4, core * .95 + rim * .8 + crack * .5); }
+      #include <colorspace_fragment>
+    }` });
+const fissureMeshes = Array.from({ length: C.max_fissures }, () => { const m = new THREE.Mesh(new THREE.CircleGeometry(C.fissure_radius * 1.25, 40), fissureMat()); m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m); return m; });
+const sprout = new THREE.Group(); scene.add(sprout); sprout.visible = false;
+{ const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.22, 5), new THREE.MeshStandardMaterial({ color: 0x7fd38c, roughness: 0.6 })); stem.position.y = 0.11; sprout.add(stem);
+  for (const sd of [-1, 1]) { const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshStandardMaterial({ color: 0x9fe6a0, emissive: 0x2e6b3a, emissiveIntensity: 0.4 }));
+    leaf.scale.set(1.6, 0.35, 0.8); leaf.position.set(sd * 0.06, 0.2, 0); leaf.rotation.z = sd * 0.5; sprout.add(leaf); } }
+const lureRings = Array.from({ length: 3 }, () => { const m = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 48), new THREE.MeshBasicMaterial({ color: 0xc9bcff, transparent: true, opacity: 0, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.03; m.visible = false; m.userData.age = 9; scene.add(m); return m; });
+function ripple(x, y) { const r = lureRings.reduce((a, b) => (a.userData.age > b.userData.age ? a : b)); r.position.set(toX(x), 0.03, toZ(y)); r.userData.age = 0; }
 
 // ------------------------------------------------------------------ the predator ("Shade"): a long low body of linked segments
 const shade = new THREE.Group(); scene.add(shade);
@@ -234,6 +261,8 @@ let world, policies = {}, brainKey = null, brain = null;
 let prev = null, cur = null, acc = 0, speed = 1, paused = false, episode = 0, lastProbs = null, lastAction = 7;
 let behave = { label: "", since: 0, prevHeard: false, prevShelter: false, wasLow: false, closing: 0, lastFoodD: Infinity, idleT: 0, threatT: 0 };
 let tool = null, endTimer = 0, dying = null, flinchT = 0;
+let influence = 3, influenceClock = 0;  // the visitor's limited influence: 3 acts, one returns every 200 world ticks
+function drawMotes() { document.querySelectorAll("#motes i").forEach((m, i) => m.classList.toggle("on", i < influence)); }
 // ---- Vela's body: critically-damped-ish springs driven only by simulation quantities (v, ω, Δv, stamina, senses)
 const spring = () => ({ x: 0, v: 0 });
 const body = { pitch: spring(), roll: spring(), squash: spring(), twist: spring(), lift: spring(), phase: 0, glanceT: 0, glance: 0, accel: 0 };
@@ -310,7 +339,8 @@ const rlog = { events: [], rewardTrace: [], ret: 0, value: null };
 function newEpisode(seed = null) {
   world = new World("standard");
   world.reset(seed ?? 4000000000 + Math.floor(Math.random() * 100000000));
-  rlog.events = [{ tick: 0, text: `episode start · seed ${world.seed}` }]; rlog.rewardTrace = [0]; rlog.ret = 0;
+  rlog.events = [{ tick: 0, text: `episode start · seed ${world.seed}` }]; rlog.rewardTrace = [0]; rlog.ret = 0; rlog.visitorActs = 0;
+  influence = 3; influenceClock = 0; drawMotes();
   episode++;
   buildProps(world);
   prev = cur = snap();
@@ -338,6 +368,7 @@ function tick() {
   const { a, obs, probs } = decide();
   lastProbs = probs; lastAction = a;
   const r = world.step(a);
+  if (influence < 3 && ++influenceClock >= 200) { influence += 1; influenceClock = 0; drawMotes(); }
   rlog.ret += r.reward; rlog.rewardTrace.push(rlog.ret); if (rlog.rewardTrace.length > 1600) rlog.rewardTrace.shift();
   if (r.dashing && !(prev && prev.dashing)) rlog.events.push({ tick: world.t, text: "dash started" });
   prev = cur; cur = snap(); cur.obs = obs; cur.action = a; cur.dashing = r.dashing; cur.probs = probs;
@@ -360,10 +391,17 @@ function endEpisode() {
 // ------------------------------------------------------------------ events → visuals + sound
 let lastRipple = -10;
 function panOf(x) { return clamp((toX(x) - camTarget.x) / 6, -1, 1); }
-const EV_TEXT = { eat: "seed eaten", grow: "seed regrew", enter_shelter: "entered shelter", leave_shelter: "left shelter", rain_start: "rain began", rain_end: "rain stopped", caught: "CAUGHT by the predator", starved: "starved" };
+const EV_TEXT = { eat: "seed eaten", grow: "seed grew", enter_shelter: "entered cover", leave_shelter: "left cover", rain_start: "rain began", rain_end: "rain stopped",
+  caught: "CAUGHT by the predator", starved: "starved", plant: "a seed was planted", raise: "a thicket began to grow", thicket_gone: "a thicket withered away",
+  fissure_warning: "the ground trembles (fissure warning)", fissure_open: "a fissure opened", fissure_closed: "a fissure closed", injured: "Vela was injured" };
+const ACT_KINDS = new Set(["plant", "raise", "rain_start", "fissure_warning", "lure"]);
 function handleEvents(evs) {
   for (const e of evs) {
-    if (e.kind !== "grow") rlog.events.push({ tick: e.tick, text: e.kind === "predator_mode" ? `predator: ${e.from} → ${e.to}` : EV_TEXT[e.kind] || e.kind });
+    if (e.kind !== "grow") rlog.events.push({ tick: e.tick, source: e.source, text: (ACT_KINDS.has(e.kind) ? `[${e.source}] ` : "") + (e.kind === "predator_mode" ? `predator: ${e.from} → ${e.to}` : EV_TEXT[e.kind] || e.kind) });
+    if (e.kind === "fissure_warning") sound.rumble(panOf(e.x), C.fissure_warn * TICK / speed);
+    else if (e.kind === "fissure_open") sound.crack(panOf(e.x));
+    else if (e.kind === "raise") sound.rustle(panOf(e.x), C.raised_grow * TICK / speed);
+    else if (e.kind === "plant") sound.chime(panOf(e.x), 0.3);
     if (rlog.events.length > 200) rlog.events.splice(0, 50);
     if (e.kind === "eat") { velaEvents.push({ id: e.id, clip: "Collect" }); sound.chime(panOf(e.x)); sound.voice("content", panOf(world.x)); seedFx(e.index, 0); }
     else if (e.kind === "grow") seedFx(e.index, 1);
@@ -431,7 +469,9 @@ const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 
 document.querySelectorAll(".tools button").forEach((b) => b.addEventListener("click", () => {
   tool = tool === b.dataset.tool ? null : b.dataset.tool;
   document.querySelectorAll(".tools button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.tool === tool ? "true" : "false"));
-  if (tool) toast({ seed: "Tap open ground to move a seed there.", slate: "Tap open ground to place a slate.", vent: "Tap a vent ring to wake it.", sound: "Tap anywhere: the predator will come to search where Vela is." }[tool], 2400);
+  if (tool) toast({ plant: "Tap open ground: a seed will sprout there.", thicket: "Tap open ground: a thicket will grow, shelter for a while, then wither.",
+    rain: "Tap anywhere to call the rain. It hides Vela, feeds the meadows, and muffles what Vela hears.",
+    lure: "Tap a spot: the predator will go there to search.", ground: "Tap a spot: the ground will tremble, then a fissure opens." }[tool], 2600);
 }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") { tool = null; document.querySelectorAll(".tools button").forEach((x) => x.setAttribute("aria-pressed", "false")); } if (e.key === " ") { paused = !paused; toast(paused ? "Paused" : "Resumed", 900); e.preventDefault(); } });
 // phone: a tap on the world (no tool active) hides or shows the panels; the gear opens settings
@@ -449,25 +489,15 @@ canvas.addEventListener("pointerdown", (e) => {
   if (!ray.ray.intersectPlane(plane, hit)) return;
   const sx = hit.x + W / 2, sy = hit.z + H / 2;
   let ok = false, why = "";
-  if (tool === "seed") {
-    let best = -1, bd = -1;
-    world.food.forEach((f, i) => { if (f.on) { const d = (f.x - world.x) ** 2 + (f.y - world.y) ** 2; if (d > bd) { bd = d; best = i; } } });
-    ok = best >= 0 && world.moveFood(best, sx, sy);
-    why = best < 0 ? "No ripe seed to move right now." : "Seeds only grow on open ground (not in slates, thickets, water or vents, and not right under Vela).";
-    if (ok) { view.seeds[best].g.position.set(toX(sx), 0, toZ(sy)); sound.chime(panOf(sx), 0.5); }
-  } else if (tool === "slate") {
-    const before = world.slates.findIndex((o) => !o.on);
-    ok = world.insertObstacle(0.6, [sx, sy]);
-    why = before < 0 ? "The Fold holds no more slates." : "A slate needs clear ground: away from Vela, the predator, seeds, thickets and water.";
-    if (ok) { addSlate(world.slates[before], before); sound.thud(panOf(sx), 90, 0.18); }
-  } else if (tool === "vent") {
-    let best = -1, bd = 2.25;
-    world.vents.forEach((v, i) => { if (v.present) { const d = (v.x - sx) ** 2 + (v.y - sy) ** 2 - v.r * v.r; if (d < bd) { bd = d; best = i; } } });
-    ok = best >= 0 && world.wakeVent(best); why = "Tap closer to a vent ring.";
-  } else if (tool === "sound") {
-    ok = world.alertPredator(); why = world.pred.mode === "rest" || world.pred.mode === 3 ? "The predator is resting and does not stir." : "Nothing hunts here now.";
-    sound.thud(panOf(sx), 160, 0.12);
-  }
+  if (influence <= 0) { toast("Your influence is spent. It returns slowly.", 2200); return; }
+  world.actSource = "visitor";
+  if (tool === "plant") { ok = world.plantSeed([sx, sy]); why = world.plantTimer > 0 || world.food[C.max_food - 1].on ? "A planted seed is already growing." : "Seeds need open ground: not in thickets, slates, water or vents, and not under Vela."; }
+  else if (tool === "thicket") { ok = world.raiseThicket([sx, sy]); why = world.shelters[C.max_shelters - 1].on ? "Your last thicket is still standing." : "A thicket needs open space away from other thickets, slates, water and the edges."; }
+  else if (tool === "rain") { ok = world.callRain(); why = "It is already raining."; }
+  else if (tool === "lure") { ok = world.alertPredator([sx, sy]); why = world.pred.mode === 3 ? "The predator is resting and does not stir." : "Nothing hunts here now."; if (ok) { ripple(sx, sy); sound.thud(panOf(sx), 160, 0.14); } }
+  else if (tool === "ground") { ok = world.wakeGround([sx, sy]); why = "The ground here cannot open (too close to the edge, or two fissures already)."; }
+  world.actSource = null;
+  if (ok) { influence -= 1; rlog.visitorActs += 1; drawMotes(); handleEvents(world.events.splice(0)); }
   if (!ok) toast(why, 2600);
   cur = snap(); prev = prev || cur;
 });
@@ -542,7 +572,7 @@ function render(dt, t, a) {
     const fl = flinchT > 0 ? Math.sin((0.45 - flinchT) / 0.45 * Math.PI) : 0;  // a quick involuntary squash (vent contact)
     // measured acceleration from the simulation (u/tick per tick), smoothed
     const accRaw = (s.v - p0.v) / TICK; body.accel = lerp(body.accel, accRaw, clamp(dt * 8, 0, 1));
-    const vn = clamp(s.v / C.v_max, 0, 1), vitality = clamp(0.35 + 0.65 * (s.stamina / 0.5), 0.35, 1) * (s.energy < 0.2 ? 0.7 : 1);
+    const vn = clamp(s.v / C.v_max, 0, 1), vitality = clamp(0.35 + 0.65 * (s.stamina / 0.5), 0.35, 1) * (s.energy < 0.2 ? 0.7 : 1) * (s.injury > 0 ? 0.75 : 1);
     const tense = threat && !s.inShelter, exhausted = s.stamina < 0.2;
     const k = exhausted ? 55 : tense ? 210 : 130, c = exhausted ? 7 : tense ? 22 : 15;  // tired bodies recover slowly; frightened ones are taut
     // sail-pulse gait: stride rate follows real speed; amplitude fades with fatigue; no motion when still
@@ -625,17 +655,36 @@ function render(dt, t, a) {
   frondT += dt;
   const fr = view.fronds, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
   const px = toX(world.pred.x), pz = toZ(world.pred.y);
+  const rs = world.shelters[fr.RAISED], rkey = rs.on ? `${rs.x.toFixed(3)},${rs.y.toFixed(3)}` : null;
+  if (rkey !== fr.raisedKey) {  // a thicket was raised (by nature or a visitor): sow its fronds
+    fr.raisedKey = rkey;
+    if (rs.on) { const fresh = fr.scatter(rs, fr.RAISED, fr.RAISED_N, mulberry(Math.floor(rs.x * 997 + rs.y * 131)));
+      let j = 0; for (let i = 0; i < fr.base.length; i++) if (fr.base[i].slot === fr.RAISED) fr.base[i] = fresh[j++]; }
+  }
   for (let i = 0; i < fr.inst.count; i++) {
-    const b = fr.base[i];
+    const b = fr.base[i], shl = world.shelters[b.slot], hh = shl.on ? shl.h : 0;
+    if (hh <= 0.001) { m4.makeScale(0, 0, 0); fr.inst.setMatrixAt(i, m4); continue; }
     const dv = Math.hypot(b.x - vx, b.z - vz), dp = Math.hypot(b.x - px, b.z - pz);
     const push = Math.max(0, 1 - dv / 0.7) * 0.9 + Math.max(0, 1 - dp / 0.9) * 0.6;
     const wind = reduceMotion ? 0 : Math.sin(frondT * (1.1 + 0.5 * s.raining) + b.ph + b.x * 0.4) * (0.08 + 0.1 * s.raining);
-    e.set(b.lean + wind + push, b.yaw, 0, "YXZ");
-    if (push > 0) { const ang = Math.atan2(b.z - vz, b.x - vx); e.set(b.lean + wind + push, -ang + Math.PI / 2, 0, "YXZ"); }
-    q.setFromEuler(e); sc.set(1, b.hgt * (1 - 0.15 * push), 1); ps.set(b.x, 0, b.z);
+    const droop = (1 - hh) * 0.7;  // wilting fronds sag and shorten; healthy ones stand
+    e.set(b.lean + wind + push + droop, b.yaw, 0, "YXZ");
+    if (push > 0) { const ang = Math.atan2(b.z - vz, b.x - vx); e.set(b.lean + wind + push + droop, -ang + Math.PI / 2, 0, "YXZ"); }
+    q.setFromEuler(e); sc.set(1, b.hgt * (0.3 + 0.7 * hh) * (1 - 0.15 * push), 1); ps.set(b.x, 0, b.z);
     m4.compose(ps, q, sc); fr.inst.setMatrixAt(i, m4);
+    fr.inst.setColorAt(i, _fc.copy(FROND_WILTED).lerp(FROND_HEALTHY, clamp((hh - 0.2) / 0.6, 0, 1)));
   }
-  fr.inst.instanceMatrix.needsUpdate = true;
+  fr.inst.instanceMatrix.needsUpdate = true; if (fr.inst.instanceColor) fr.inst.instanceColor.needsUpdate = true;
+  s.meadows.forEach((mm, k) => { groundU.uMeadows.value[k].z = clamp((mm.fertility - C.fertility_floor) / (C.fertility_gain + C.rain_fertility), 0, 1); });
+  // fissures: trembling cracks (warning), then an ember-rimmed opening
+  world.fissures.forEach((z, i) => { const fm = fissureMeshes[i]; fm.visible = z.state > 0;
+    if (z.state > 0) { fm.position.set(toX(z.x), 0.018, toZ(z.y)); fm.material.uniforms.uState.value = z.state; fm.material.uniforms.uTime.value = t;
+      fm.material.uniforms.uProg.value = z.state === 1 ? 1 - z.timer / C.fissure_warn : 1; } });
+  // a planted seed sprouting
+  const g = world.food[C.max_food - 1];
+  sprout.visible = world.plantTimer > 0;
+  if (sprout.visible) { sprout.position.set(toX(g.x), 0, toZ(g.y)); sprout.scale.setScalar(0.25 + 0.75 * (1 - world.plantTimer / C.seed_ripen)); }
+  lureRings.forEach((lr) => { lr.userData.age += dt; const k2 = lr.userData.age / 1.6; lr.visible = k2 < 1; if (lr.visible) { lr.scale.setScalar(0.3 + 2.4 * k2); lr.material.opacity = 0.6 * (1 - k2); } });
   frondMat.emissiveIntensity = 0.2 + 0.4 * (1 - light);
   // predator body: head follows the simulation; segments trail along its real path
   const P0 = p0.pred, P1 = s.pred;
@@ -710,7 +759,7 @@ function drawProbs(probs, chosen) {
 
 // ------------------------------------------------------------------ research console API (read-only + seed restart)
 const researchApi = {
-  state: () => cur && { obs: cur.obs, probs: cur.probs, action: cur.action, value: rlog.value, rewardTrace: rlog.rewardTrace, events: rlog.events },
+  state: () => cur && { obs: cur.obs, probs: cur.probs, action: cur.action, value: rlog.value, rewardTrace: rlog.rewardTrace, events: rlog.events, visitorActs: rlog.visitorActs },
   rayRel: () => RAY_REL,
   seed: () => world?.seed,
   restart: (seed) => { newEpisode(seed); toast(`Restarted seed ${seed} with the same brain.`, 2200); },

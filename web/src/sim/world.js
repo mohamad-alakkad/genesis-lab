@@ -334,7 +334,7 @@ export class World {
     return !this.inShelter && norm2(this.x - p.x, this.y - p.y) < c.catch_dist;
   }
 
-  emit(kind, extra = {}) { this.events.push({ id: `${this.seed}:${this.t}:${this.eventSeq++}`, tick: this.t, kind, ...extra }); }
+  emit(kind, extra = {}) { this.events.push({ id: `${this.seed}:${this.t}:${this.eventSeq++}`, tick: this.t, kind, source: this.actSource || "nature", ...extra }); }
 
   step(a) {
     const c = this.c, rc = c.creature_radius;

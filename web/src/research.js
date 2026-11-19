@@ -107,7 +107,8 @@ export function initResearch(api) {
         el("div", {}, el("h3", { html: `Reward this episode ${tag("LIVE")}` }), spark, el("p", { class: "rc-note" }, "Cumulative training reward: +1 seed, −0.05/tick in an active vent, −1 starvation, −2 caught. Nothing rewards hiding or resting.")),
         el("div", {}, el("h3", { html: `Behavioral events ${tag("LIVE")}` }), ev)),
       senses,
-      el("div", { class: "rc-row" }, el("button", { class: "rc-btn", id: "rcReplay" }, "Restart this episode's seed"), el("span", { class: "rc-note", id: "rcSeed" })));
+      el("div", { class: "rc-row" }, el("button", { class: "rc-btn", id: "rcReplay" }, "Restart this episode's seed"), el("span", { class: "rc-note", id: "rcSeed" })),
+      el("p", { class: "rc-note", id: "rcVisitor" }));
     liveEls = { svg, probs, selfT, scal, ev, spark };
     wrap.querySelector("#rcReplay").onclick = () => api.restart(api.seed());
     updateLive();
@@ -151,6 +152,8 @@ export function initResearch(api) {
     if (n > 1) { const mn = Math.min(0, ...rw), mx = Math.max(1, ...rw); const pts = rw.map((v, i) => `${(i / (n - 1)) * 300},${58 - ((v - mn) / (mx - mn)) * 54}`).join(" ");
       liveEls.spark.innerHTML = `<polyline points="${pts}" fill="none" stroke="#FFB36B" stroke-width="2" vector-effect="non-scaling-stroke"/><text x="296" y="10" text-anchor="end">${fmt(rw[n - 1], 2)}</text>`; }
     liveEls.ev.replaceChildren(...s.events.slice(-14).reverse().map((e) => el("li", { html: `<code>t=${e.tick ?? "—"}</code> ${e.text}` })));
+    const vEl = document.getElementById("rcVisitor");
+    if (vEl) vEl.innerHTML = s.visitorActs ? `${tag("LIVE")} This episode includes ${s.visitorActs} visitor intervention${s.visitorActs > 1 ? "s" : ""} (marked [visitor] above). Visitor episodes are never part of the evaluation data; nature performs the same acts at fixed rates during training and evaluation.` : "";
     document.getElementById("rcSeed") && (document.getElementById("rcSeed").textContent = `episode seed ${api.seed()} · world ${api.brainMeta()?.spec ?? ""} · family standard`);
   }
 

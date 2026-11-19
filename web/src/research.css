@@ -98,3 +98,9 @@ body.rc-on .tools { right: calc(min(600px, 48vw) + 2%); }
   body.rc-on .tools, body.rc-on .specimen { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .rc-rays .heard { animation: none; } }
+/* with the console open, the tools collapse to icons so they sit beside Vela's card instead of over it */
+@media (min-width: 651px) {
+  body.rc-on .tools { gap: 6px; }
+  body.rc-on .tools button { width: 46px; height: 46px; }
+  body.rc-on .tools button span { display: none; }
+}

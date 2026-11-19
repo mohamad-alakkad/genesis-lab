@@ -59,12 +59,12 @@ def main(argv):
         runs = [r for r in (read_store(_branch(lin, s)) for s in seeds.split(",")) if r]
         if runs:
             lineages[lin] = runs
-    cpath = ROOT / "cloud" / "conditions.json"  # controlled experiments: one lineage, runs named by condition
-    if cpath.exists() and not argv:
-        conds = json.loads(cpath.read_text())["tokens"]
-        runs = [r for r in (read_store("genesis-store-" + c["run"]) for c in conds.values()) if r]
-        if runs:
-            lineages[runs[0]["run_id"].split("-")[0]] = runs
+    if not argv:  # controlled experiments: cloud/experiments/<lineage>.json (one per generation)
+        for cpath in sorted((ROOT / "cloud" / "experiments").glob("gen*.json")):
+            conds = json.loads(cpath.read_text())["tokens"]
+            runs = [r for r in (read_store("genesis-store-" + c["run"]) for c in conds.values()) if r]
+            if runs:
+                lineages[cpath.stem] = runs
     reports = {}
     for p in sorted((ROOT / "docs" / "reports").glob("*.json")):
         try:
@@ -74,7 +74,7 @@ def main(argv):
     out = {"schema": "genesis.research/1", "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            "source": "store branches on github.com/mohamad-alakkad/genesis-lab + docs/reports (no synthetic values)",
            "lineages": lineages, "reports": reports,
-           "world_versions": {"gen1": "1.0.0", "gen2": "2.0.0", "gen3": "2.1.0", "gen4": "2.2.0"}}
+           "world_versions": {"gen1": "1.0.0", "gen2": "2.0.0", "gen3": "2.1.0", "gen4": "2.2.0", "gen5": "3.0.0", "gen6": "3.0.0"}}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, separators=(",", ":")))
     print(f"research.json: {', '.join(f'{k}×{len(v)}' for k, v in lineages.items())}, reports {list(reports)} ({OUT.stat().st_size // 1024} KB)")

@@ -1,0 +1,121 @@
+{
+ "experiment": "gen6 objective ablation (world 3.0.0, train_broad, gamma 0.997, memory on): food reward (control) vs life reward (+0.01 per tick alive, nothing else); paired seeds 1-4; 50M steps",
+ "tokens": {
+  "F1": {
+   "run": "gen6-food-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "food"
+   }
+  },
+  "L1": {
+   "run": "gen6-life-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "life",
+    "life_reward": 0.01
+   }
+  },
+  "F2": {
+   "run": "gen6-food-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "food"
+   }
+  },
+  "L2": {
+   "run": "gen6-life-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "life",
+    "life_reward": 0.01
+   }
+  },
+  "F3": {
+   "run": "gen6-food-s3",
+   "seed": 3,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "food"
+   }
+  },
+  "L3": {
+   "run": "gen6-life-s3",
+   "seed": 3,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "life",
+    "life_reward": 0.01
+   }
+  },
+  "F4": {
+   "run": "gen6-food-s4",
+   "seed": 4,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "food"
+   }
+  },
+  "L4": {
+   "run": "gen6-life-s4",
+   "seed": 4,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad",
+    "reward_mode": "life",
+    "life_reward": 0.01
+   }
+  }
+ }
+}

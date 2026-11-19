@@ -55,30 +55,36 @@ export function initResearch(api) {
   // ---------------------------------------------------------------- overview
   function overview() {
     const b = api.brainMeta(), params = api.paramCount();
-    const g4 = research?.reports?.["gen4-results"], g3 = research?.reports?.["gen3-diagnosis"], g2 = research?.reports?.["gen2-diagnosis"];
-    const arms = g4?.arms || {}, armBest = (k) => arms[k]?.best;
-    const top = Object.values(arms).map((a) => a.best?.ticks?.mean || 0);
-    const it = g4?.interpretation || {};
-    const ARM_LABEL = { "gen4-mem-g997": "memory · γ 0.997", "gen4-nomem-g997": "no memory · γ 0.997", "gen4-mem-g99": "memory · γ 0.99", "gen4-nomem-g99": "no memory · γ 0.99" };
+    const R = research?.reports || {}, g5 = R["gen5-families"], g4 = R["gen4-results"], g3 = R["gen3-diagnosis"], g2 = R["gen2-diagnosis"];
+    const it5 = g5?.interpretation || {}, refs = g5?.references_world_3_0 ? Object.values(g5.references_world_3_0)[0] : null;
+    const arm = (a, f) => g5?.arms?.[a]?.[f];
+    const row = (label, r) => r ? [label, `${fmt(r.ticks.mean, 0)} [${fmt(r.ticks.ci95[0], 0)}, ${fmt(r.ticks.ci95[1], 0)}]`, pct(r.caught.mean ?? r.caught), fmt(r.food.mean ?? r.food, 1),
+      r.shelter_when_threat ? pct(r.shelter_when_threat.mean ?? r.shelter_when_threat, 1) : "—"] : null;
+    const refRow = (label, r) => r ? [label, fmt(r.ticks, 0), pct(r.caught), fmt(r.food, 1), r.shelter_when_threat != null ? pct(r.shelter_when_threat, 1) : "—"] : null;
+    const rows = g5 ? [
+      row("standard · gen5 (trained vs fast predators)", arm("gen5-broad", "standard")), row("standard · gen5 (standard training)", arm("gen5-std", "standard")),
+      refRow("standard · scripted survivor", refs?.standard?.["scripted survivor"]), refRow("standard · privileged preemptive hider", refs?.standard?.["privileged preemptive hider"]),
+      row("relentless · gen5 (trained vs fast predators)", arm("gen5-broad", "relentless")), row("relentless · gen5 (standard training)", arm("gen5-std", "relentless")),
+      refRow("relentless · scripted survivor", refs?.relentless?.["scripted survivor"]), refRow("relentless · privileged preemptive hider", refs?.relentless?.["privileged preemptive hider"]),
+    ].filter(Boolean) : [];
+    const g6 = research?.lineages?.gen6 || [];
     return el("div", { class: "rc-sec" },
       el("p", { class: "rc-lede", html: `Vela is a <b>PPO</b> agent: two tanh MLPs (policy and value, ${b ? b.hidden.join("×") : "?"} hidden units, ${params.toLocaleString()} parameters) trained <b>from random weights</b> in a NumPy simulation, then run here unchanged: the browser executes the exported weights once per 0.1 s world tick and takes the argmax action.` }),
       el("div", { class: "rc-tiles" },
         tile("brain on stage", b ? `${b.milestone}` : "none", b ? `${b.source} · ${b.step.toLocaleString()} steps · world ${b.spec}` : "", "LIVE"),
-        tile("best arm, fresh held-out seeds", top.length ? `${fmt(Math.max(...top), 0)} ticks` : "—", "of 1500 · 400 episodes per arm · argmax", "LOG"),
-        tile("references", "724 · 1069", "scripted survivor · privileged oracle (ticks)", "LOG")),
-      el("h3", {}, "Latest experiment: what made the difference"),
-      g4 ? el("div", { class: "rc-callout", html: `${tag("LOG")} <b>Controlled 2×2 (world 2.2.0, 2 seeds per arm, 40M steps each):</b><br>
-        <b>Horizon:</b> ${it.horizon}<br><b>Memory:</b> ${it.memory}<br><b>What it actually learned:</b> ${it.strategy_learned}` }) : el("p", {}, "loading…"),
-      g4 ? table(["arm (best checkpoints)", "survival ticks (95% CI)", "caught", "seeds eaten", "sheltered when threatened"],
-        Object.keys(ARM_LABEL).filter((k) => armBest(k)).map((k) => { const a = armBest(k); return [ARM_LABEL[k], `${fmt(a.ticks.mean, 0)} [${fmt(a.ticks.ci95[0], 0)}, ${fmt(a.ticks.ci95[1], 0)}]`, pct(a.caught), fmt(a.food, 1), pct(a.shelter_when_threat, 1)]; })) : "",
-      el("p", { class: "rc-note", html: g4 ? `${g4.evaluation}. "Best" checkpoints were selected on a different seed block, so these numbers are free of that selection bias.` : "" }),
+        tile("world", b ? b.spec : "—", "fertility cycles · withering thickets · fissures · injury · five shared acts", "LOG"),
+        tile("now training", g6.length ? "gen6" : "—", g6.length ? "objective ablation: reward for food vs reward for staying alive" : "", "LOG")),
+      el("h3", {}, "Latest finding: why Vela flees instead of hiding"),
+      g5 ? el("div", { class: "rc-callout", html: `${tag("LOG")} <b>gen5 hypothesis:</b> ${it5.hypothesis_gen5}<br><b>Generalization:</b> ${it5.generalization}<br><b>Why:</b> ${it5.why}<br><b>Next:</b> ${it5.next}` }) : el("p", {}, "loading…"),
+      rows.length ? table(["condition · policy", "survival ticks (95% CI)", "caught", "seeds eaten", "sheltered when threatened"], rows) : "",
+      el("p", { class: "rc-note", html: g5 ? `${g5.seeds}. 100 episodes per run per family; arms pool 4 seeds (400 episodes). References: 100 episodes on the same fresh seeds; the hider uses privileged world state and is evaluation-only.` : "" }),
       el("h3", {}, "How we got here"),
       el("ul", { class: "rc-list", html: [
         g2 && `<li><b>gen2 (world 2.0.0):</b> ${g2.finding}</li>`,
         g3 && `<li><b>gen3 (world 2.1.0):</b> ${g3.finding}</li>`,
-        g4 && `<li><b>gen4 (world 2.2.0):</b> the longer horizon roughly halved captures; memory mattered only with the short horizon. Hiding still did not emerge; evasion did.</li>`,
-      ].filter(Boolean).join("") }),
-      el("p", { class: "rc-note" }, "Open problem: the network survives by evading, not by staying hidden (3.5% of threatened time sheltered). The privileged oracle shows hiding early could cut captures to 17%."));
+        g4 && `<li><b>gen4 (world 2.2.0):</b> ${g4.interpretation?.horizon} ${g4.interpretation?.memory}</li>`,
+        g5 && `<li><b>gen5 (world 3.0.0):</b> faster predators in training did not create conditional hiding; the food objective favors evasion even where hiding would keep Vela alive longer.</li>`,
+      ].filter(Boolean).join("") }));
   }
   const pct = (x, d = 0) => x == null ? "—" : `${(100 * x).toFixed(d)}%`;
   function tile(k, v, sub, src) { return el("div", { class: "rc-tile", html: `<div class="k">${k} ${tag(src)}</div><div class="v">${v}</div><div class="s">${sub}</div>` }); }
@@ -162,7 +168,7 @@ export function initResearch(api) {
     const wrap = el("div", { class: "rc-sec" });
     if (!research) { wrap.append(el("p", {}, "loading training records…")); return wrap; }
     const lin = research.lineages;
-    for (const name of ["gen4", "gen3", "gen2", "gen1"]) {
+    for (const name of ["gen6", "gen5", "gen4", "gen3", "gen2", "gen1"]) {
       const runs = lin[name]; if (!runs?.length) { if (name === "gen3") wrap.append(el("p", { class: "rc-note", html: `${tag("LOG")} gen3 (world 2.1.0): no published evaluations yet.` })); continue; }
       const v = research.world_versions[name] || runs[0].world_spec_version;
       const key = runs[0].eval.some((e) => e.score != null) ? "score" : "food_mean";

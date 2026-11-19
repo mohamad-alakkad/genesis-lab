@@ -1,0 +1,109 @@
+{
+ "experiment": "gen5 (world 3.0.0, gamma 0.997, memory on): predator-speed range broad (0.10-0.17, beyond Vela's cruise 0.12) vs standard (0.10-0.145); paired init seeds 1-4; 50M steps",
+ "tokens": {
+  "C1": {
+   "run": "gen5-broad-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad"
+   }
+  },
+  "D1": {
+   "run": "gen5-std-s1",
+   "seed": 1,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train"
+   }
+  },
+  "C2": {
+   "run": "gen5-broad-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad"
+   }
+  },
+  "D2": {
+   "run": "gen5-std-s2",
+   "seed": 2,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train"
+   }
+  },
+  "C3": {
+   "run": "gen5-broad-s3",
+   "seed": 3,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad"
+   }
+  },
+  "D3": {
+   "run": "gen5-std-s3",
+   "seed": 3,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train"
+   }
+  },
+  "C4": {
+   "run": "gen5-broad-s4",
+   "seed": 4,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train_broad"
+   }
+  },
+  "D4": {
+   "run": "gen5-std-s4",
+   "seed": 4,
+   "set": {
+    "total_steps": 50000000,
+    "plateau_evals": 1000,
+    "publish_minutes": 8,
+    "ckpt_minutes": 4,
+    "gamma": 0.997,
+    "obs_mask": [],
+    "train_family": "train"
+   }
+  }
+ }
+}

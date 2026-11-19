@@ -393,8 +393,8 @@ let lastRipple = -10;
 function panOf(x) { return clamp((toX(x) - camTarget.x) / 6, -1, 1); }
 const EV_TEXT = { eat: "seed eaten", grow: "seed grew", enter_shelter: "entered cover", leave_shelter: "left cover", rain_start: "rain began", rain_end: "rain stopped",
   caught: "CAUGHT by the predator", starved: "starved", plant: "a seed was planted", raise: "a thicket began to grow", thicket_gone: "a thicket withered away",
-  fissure_warning: "the ground trembles (fissure warning)", fissure_open: "a fissure opened", fissure_closed: "a fissure closed", injured: "Vela was injured" };
-const ACT_KINDS = new Set(["plant", "raise", "rain_start", "fissure_warning", "lure"]);
+  fissure_warning: "the ground trembles (fissure warning)", fissure_open: "a fissure opened", fissure_closed: "a fissure closed", injured: "Vela was injured", lure: "the predator was drawn to a point", alert: "a disturbance drew the predator toward Vela" };
+const ACT_KINDS = new Set(["plant", "raise", "rain_start", "fissure_warning", "lure", "alert"]);
 function handleEvents(evs) {
   for (const e of evs) {
     if (e.kind !== "grow") rlog.events.push({ tick: e.tick, source: e.source, text: (ACT_KINDS.has(e.kind) ? `[${e.source}] ` : "") + (e.kind === "predator_mode" ? `predator: ${e.from} → ${e.to}` : EV_TEXT[e.kind] || e.kind) });

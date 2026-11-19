@@ -205,7 +205,8 @@ export class World {
   alertPredator(at = null) {  // a disturbance: the predator searches a point (default: where Vela is); a visitor lure picks the point
     const p = this.pred;
     if (!p.on || p.mode === REST) return false;
-    p.mode = SEARCH; p.lx = at ? at[0] : this.x; p.ly = at ? at[1] : this.y; p.timer = this.c.predator_search_ticks; return true;
+    p.mode = SEARCH; p.lx = at ? at[0] : this.x; p.ly = at ? at[1] : this.y; p.timer = this.c.predator_search_ticks;
+    this.emit(at ? "lure" : "alert", { x: p.lx, y: p.ly }); return true;
   }
   cover(x, y) { const cm = this.c.cover_min; return this.shelters.some((s) => s.on && s.h > cm && norm2(s.x - x, s.y - y) < s.r); }
   fertility(k) {

@@ -13,7 +13,7 @@ const ACTIONS = C.actions.map((a) => a.replace("_", " "));
 const CH = ["solid", "seed", "vent", "shelter", "predator", "water"];
 const CH_COLOR = ["#8fa3ad", "#FFB36B", "#F2978A", "#46E7D7", "#ff5f6d", "#6f9cff"];
 const SELF = ["energy", "stamina", "speed v/vmax", "turn ω/ωmax", "in shelter", "in vent", "in water", "contact", "light", "raining",
-  "sin(day phase)", "cos(day phase)", "heard: proximity", "heard: sin bearing", "heard: cos bearing"];
+  "sin(day phase)", "cos(day phase)", "heard: proximity", "heard: sin bearing", "heard: cos bearing", "injury (recovery slowed)"].slice(0, SIM.N_SELF || 15);
 const MEM = ["memory: recency of last predator percept", "memory: sin bearing to where it was", "memory: cos bearing to where it was",
   "memory: remembered proximity", "memory: it was pouncing"].slice(0, N_MEM);
 const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === "class") e.className = v; else if (k === "html") e.innerHTML = v; else e.setAttribute(k, v); } for (const c of kids) e.append(c); return e; };
@@ -144,8 +144,8 @@ export function initResearch(api) {
     for (let k = 0; k < C.n_rays; k++) rows.push(`<tr><td>ray ${k} (${fmt(api.rayRel()[k] * 180 / Math.PI, 0)}°)</td>${CH.map((c, ch) => `<td class="${o[N_CH * k + ch] > 0 ? "hot" : ""}">${fmt(o[N_CH * k + ch], 2)}</td>`).join("")}</tr>`);
     liveEls.selfT.innerHTML = `<table class="rc-table obs"><tr><th>input</th>${CH.map((c) => `<th>${c}</th>`).join("")}</tr>${rows.join("")}</table>
       <table class="rc-table obs"><tr><th>#</th><th>self / environment input</th><th>value</th></tr>${SELF.map((n, i) => `<tr><td>${S + i}</td><td>${n}</td><td>${fmt(o[S + i], 3)}</td></tr>`).join("")}
-      ${MEM.map((n, i) => `<tr><td>${S + 15 + i}</td><td>${n}</td><td>${fmt(o[S + 15 + i], 3)}</td></tr>`).join("")}
-      <tr><td>${S + 15 + N_MEM}–${S + 22 + N_MEM}</td><td>last action (one-hot)</td><td>${ACTIONS[Array.from(o.slice(S + 15 + N_MEM)).indexOf(1)] ?? "—"}</td></tr></table>`;
+      ${MEM.map((n, i) => `<tr><td>${S + SELF.length + i}</td><td>${n}</td><td>${fmt(o[S + SELF.length + i], 3)}</td></tr>`).join("")}
+      <tr><td>${S + SELF.length + N_MEM}–${S + SELF.length + N_MEM + 7}</td><td>last action (one-hot)</td><td>${ACTIONS[Array.from(o.slice(S + SELF.length + N_MEM)).indexOf(1)] ?? "—"}</td></tr></table>`;
     // reward sparkline
     const rw = s.rewardTrace; const n = rw.length;
     if (n > 1) { const mn = Math.min(0, ...rw), mx = Math.max(1, ...rw); const pts = rw.map((v, i) => `${(i / (n - 1)) * 300},${58 - ((v - mn) / (mx - mn)) * 54}`).join(" ");

@@ -8,7 +8,9 @@ def test_trainer_runs_checkpoints_and_resumes(tmp_path, monkeypatch):
     monkeypatch.setenv("GENESIS_STORE_REMOTE", "")
     cfg = dict(trainer.DEFAULT_CONFIG, n_envs=16, n_steps=32, minibatch=256, total_steps=1024, eval_every_steps=512,
                eval_episodes=4, hidden=[16, 16])
-    cfg["obs_mask"] = [81, 82, 83, 84, 85]  # the 5 memory inputs
+    from genesis.world import N_CH, N_SELF, N_MEM, C as WC
+    S = N_CH * WC["n_rays"] + N_SELF
+    cfg["obs_mask"] = list(range(S, S + N_MEM))  # the memory inputs
     t = trainer.Trainer("smoke", cfg, None, log=lambda *_: None)
     state, reason = t.run(segments=1)
     assert state == "budget_exhausted" and t.state["global_step"] >= 1024

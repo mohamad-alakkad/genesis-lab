@@ -18,7 +18,8 @@ SPEC_VERSION = C["world_spec_version"]
 N_ACTIONS = len(C["actions"])
 N_CH = 6  # ray channels: solid, seed, vent, shelter, predator, water
 N_MEM = 5  # memory of Vela's own last predator percept (2.2.0)
-OBS_DIM = C["n_rays"] * N_CH + 15 + N_MEM + N_ACTIONS
+N_SELF = 16  # 3.0.0: + injury
+OBS_DIM = C["n_rays"] * N_CH + N_SELF + N_MEM + N_ACTIONS
 U32 = np.uint32
 TWO_PI = 2 * math.pi
 PATROL, HUNT, SEARCH, REST = 0, 1, 2, 3
@@ -69,13 +70,19 @@ class World:
         self.vent_pos = z(MV, 2); self.vent_r = z(MV); self.vent_on = np.zeros((E, MV), bool)
         self.vent_present = np.zeros((E, MV), bool); self.vent_timer = np.zeros((E, MV), np.int64)
         self.meadow = z(NM, 2)
-        self.food_pos = z(MF, 2); self.food_on = np.zeros((E, MF), bool); self.food_timer = np.zeros((E, MF), np.int64)
+        self.food_pos = z(MF, 2); self.food_on = np.zeros((E, MF), bool); self.food_timer = z(MF)
+        self.plant_timer = np.zeros(E, np.int64)  # ripening of the planted seed (slot max_food-1)
+        self.meadow_phase = np.zeros((E, NM), np.int64)
+        self.sh_h = z(MS); self.sh_life = np.full((E, MS), -1, np.int64)  # thicket health; life ≥ 0 = raised thicket
+        MFZ = c["max_fissures"]
+        self.fz_pos = z(MFZ, 2); self.fz_state = np.zeros((E, MFZ), np.int64); self.fz_timer = np.zeros((E, MFZ), np.int64)
+        self.injury = np.zeros(E, np.int64)
         self.pr_on = np.zeros(E, bool); self.pr_pos = z(2); self.pr_heading = z(); self.pr_mode = np.zeros(E, np.int64)
         self.pr_timer = np.zeros(E, np.int64); self.pr_fatigue = z(); self.pr_target = z(2); self.pr_last = z(2)
         self.pr_speed = z(); self.pr_seen = np.zeros(E, bool); self.pr_pounce = np.zeros(E, bool)
         self.mem_t = np.full(E, 10**6, np.int64); self.mem_pos = z(2); self.mem_pounce = np.zeros(E, bool)
         self.stat_keys = ("food", "hazard", "dist", "contact", "ret", "caught", "threat", "shelter_threat", "shelter",
-                          "rest", "dash", "dash_threat", "night", "shelter_night")
+                          "rest", "dash", "dash_threat", "night", "shelter_night", "injury")
         self.ep = {k: z() for k in self.stat_keys}
         self.events = []
         self.ray_rel = np.linspace(-c["fov"] / 2, c["fov"] / 2, c["n_rays"])
@@ -200,7 +207,8 @@ class World:
             if not ms.any():
                 continue
             r = 0.9 + self._u(ms) * 0.4
-            pts, _ = self._sample_point(ms, r + 0.2, lambda p: self._slates_ok(p, r + gap) & self._shelters_ok(p, r + 1.0))
+            wall = r + 2 * pr + 0.05  # 3.0.0: the predator can always pass between a thicket and a wall
+            pts, _ = self._sample_point(ms, wall, lambda p: self._slates_ok(p, r + gap) & self._shelters_ok(p, r + 1.0))
             self.sh_pos[ms, s] = pts[ms]; self.sh_r[ms, s] = r[ms]; self.sh_on[ms, s] = True
         # 2b. pools (shallow water: slows both creature and predator)
         n = f["pool_min"] + np.floor(self._u(m) * (f["pool_max"] - f["pool_min"] + 1)).astype(np.int64)
@@ -229,8 +237,12 @@ class World:
             d = _norm(self.sh_pos - p[:, None, :]) - self.sh_r
             near = np.any(self.sh_on & (d <= c["meadow_shelter_max"]), 1)
             return self._shelters_ok(p, c["meadow_shelter_min"]) & near & self._slates_ok(p, 0.0) & self._pools_ok(p, 1.0)
+        def clear_hollow(p):  # meadow 0: the rich hollow beside the first vent (no cover nearby)
+            dv = _norm(self.vent_pos[:, 0] - p) - self.vent_r[:, 0]
+            return ((dv >= c["hollow_vent_min"]) & (dv <= c["hollow_vent_max"]) & self._shelters_ok(p, 1.0)
+                    & self._slates_ok(p, 0.0) & self._pools_ok(p, 1.0))
         for k in range(c["n_meadows"]):
-            pts, _ = self._sample_point(m, 1.5, clear_m)
+            pts, _ = self._sample_point(m, 1.5, clear_hollow if (k == 0 and f["n_vents"] > 0) else clear_m)
             self.meadow[m, k] = pts[m]
         # 5. creature
         def clear_c(p):
@@ -253,7 +265,7 @@ class World:
         for i in range(f["food_n"]):
             self._place_food(m, i)
             self.food_on[m, i] = True
-        self.food_timer[m] = 0
+        self.food_timer[m] = 0.0; self.plant_timer[m] = 0
         # 8. time of day
         if f["t0_fixed"] >= 0:
             self.t0[m] = f["t0_fixed"]
@@ -264,11 +276,22 @@ class World:
         self.raining[m] = rain[m]
         self.weather_timer[m] = self._weather_duration(m, rain)[m]
         self.in_water[m] = self._in_pool(self.pos)[m]
+        if not f["rain"]:  # drought family: the sky stays dry (draws above still consumed for comparability)
+            self.raining[m] = False; self.weather_timer[m] = 10**9
+        # 10. meadow fertility phases · 11. thicket health · fissures closed · no injury
+        for k in range(c["n_meadows"]):
+            self.meadow_phase[m, k] = np.floor(self._u(m) * c["fertility_period"]).astype(np.int64)[m]
+        for sl in range(c["max_shelters"]):
+            ms = m & self.sh_on[:, sl]
+            if ms.any():
+                self.sh_h[ms, sl] = (c["thicket_h_min"] + self._u(ms) * (1 - c["thicket_h_min"]))[ms]
+        self.sh_life[m] = -1
+        self.fz_state[m] = 0; self.fz_timer[m] = 0; self.fz_pos[m] = -100.0
+        self.injury[m] = 0
         self.energy[m] = c["energy_start"]; self.stamina[m] = 1.0; self.v[m] = 0.0; self.w[m] = 0.0
         self.t[m] = 0; self.last_action[m] = A_REST
         self.contact[m] = False; self.in_hazard[m] = False; self.resting[m] = False
-        d = _norm(self.sh_pos - self.pos[:, None, :])
-        self.in_shelter[m] = np.any(self.sh_on & (d < self.sh_r), 1)[m]
+        self.in_shelter[m] = self._cover(self.pos)[m]
         self.mem_t[m] = 10**6; self.mem_pos[m] = 0.0; self.mem_pounce[m] = False
         self._update_memory(m)
         for k in self.stat_keys:
@@ -319,16 +342,102 @@ class World:
         self.vent_timer[mm, v] = 300
         return mm
 
-    def alert_predator(self, mask):
-        """Something draws the predator's attention to the creature's position (it searches there)."""
+    def alert_predator(self, mask, at=None):
+        """A disturbance draws the predator to search a point (default: where Vela is). A visitor 'lure' chooses the point."""
         mm = mask & self.pr_on & (self.pr_mode != REST)
-        self.pr_mode[mm] = SEARCH; self.pr_last[mm] = self.pos[mm]; self.pr_timer[mm] = self.c["predator_search_ticks"]
+        pt = self.pos if at is None else np.broadcast_to(np.asarray(at, np.float64), (self.E, 2))
+        self.pr_mode[mm] = SEARCH; self.pr_last[mm] = pt[mm]; self.pr_timer[mm] = self.c["predator_search_ticks"]
         return mm
+
+    def _cover(self, p):
+        """Effective cover: inside a thicket whose health is above the concealment threshold."""
+        d = _norm(self.sh_pos - p[:, None, :])
+        return np.any(self.sh_on & (self.sh_h > self.c["cover_min"]) & (d < self.sh_r), 1)
+
+    def fertility(self, k):
+        c = self.c
+        cyc = 0.5 + 0.5 * np.sin(TWO_PI * (self.t + self.meadow_phase[:, k]) / c["fertility_period"])
+        return c["fertility_floor"] + c["fertility_gain"] * cyc + c["rain_fertility"] * self.raining
+
+    def plant_seed(self, mask, at=None):
+        """A seed sprouts and ripens over seed_ripen ticks (slot max_food-1)."""
+        c = self.c; g = c["max_food"] - 1; rf = c["food_radius"]
+        mask = mask & ~self.food_on[:, g] & (self.plant_timer <= 0)
+        if not mask.any():
+            return np.zeros(self.E, bool)
+        def clear(p):
+            return (self._slates_ok(p, rf + 0.1) & self._not_in_vents(p) & self._shelters_ok(p, rf) & self._pools_ok(p, rf)
+                    & (_norm(p - self.pos) > 1.0))
+        if at is None:
+            pts, ok = self._sample_point(mask, 0.5, clear)
+        else:
+            pts = np.broadcast_to(np.asarray(at, np.float64), (self.E, 2)).copy()
+            W, H = c["width"], c["height"]
+            ok = mask & (pts[:, 0] >= 0.5) & (pts[:, 1] >= 0.5) & (pts[:, 0] <= W - 0.5) & (pts[:, 1] <= H - 0.5) & clear(pts)
+        ok &= mask
+        self.food_pos[ok, g] = pts[ok]; self.plant_timer[ok] = c["seed_ripen"]
+        return ok
+
+    def raise_thicket(self, mask, at=None):
+        """A young thicket grows (raised_grow ticks), lives raised_life ticks, then withers (slot max_shelters-1)."""
+        c = self.c; sl = c["max_shelters"] - 1; r = c["raised_radius"]
+        mask = mask & ~self.sh_on[:, sl]
+        if not mask.any():
+            return np.zeros(self.E, bool)
+        def clear(p):
+            return self._slates_ok(p, r + 0.2) & self._shelters_ok(p, r + 0.5) & self._pools_ok(p, r)
+        wall = r + 2 * c["predator_radius"] + 0.05
+        if at is None:
+            pts, ok = self._sample_point(mask, wall, clear)
+        else:
+            pts = np.broadcast_to(np.asarray(at, np.float64), (self.E, 2)).copy()
+            W, H = c["width"], c["height"]
+            ok = mask & (pts[:, 0] >= wall) & (pts[:, 1] >= wall) & (pts[:, 0] <= W - wall) & (pts[:, 1] <= H - wall) & clear(pts)
+        ok &= mask
+        self.sh_pos[ok, sl] = pts[ok]; self.sh_r[ok, sl] = r; self.sh_on[ok, sl] = True
+        self.sh_h[ok, sl] = 0.0; self.sh_life[ok, sl] = c["raised_life"]
+        return ok
+
+    def call_rain(self, mask):
+        m = mask & ~self.raining
+        if m.any():
+            self.raining[m] = True
+            self.weather_timer[m] = self._weather_duration(m, np.ones(self.E, bool))[m]
+        return m
+
+    def wake_ground(self, mask, at=None):
+        """A fissure: 'fissure_warn' ticks of warning (sensed on the vent channel), then open for a while."""
+        c, f = self.c, self.f
+        free = self.fz_state == 0
+        mask = mask & free.any(1)
+        if not mask.any():
+            return np.zeros(self.E, bool)
+        slot = np.argmax(free, 1)
+        if at is None:
+            if f["n_vents"] <= 0:
+                return np.zeros(self.E, bool)
+            k = np.minimum(np.floor(self._u(mask) * f["n_vents"]).astype(np.int64), f["n_vents"] - 1)
+            ang = self._u(mask) * TWO_PI
+            vr = self.vent_r[np.arange(self.E), k]
+            dist = vr + c["fissure_vent_min"] + self._u(mask) * (c["fissure_vent_max"] - c["fissure_vent_min"])
+            vp = self.vent_pos[np.arange(self.E), k]
+            pts = vp + np.stack([dist * np.cos(ang), dist * np.sin(ang)], 1)
+            fr = c["fissure_radius"]
+            pts[:, 0] = np.clip(pts[:, 0], fr, c["width"] - fr); pts[:, 1] = np.clip(pts[:, 1], fr, c["height"] - fr)
+            ok = mask.copy()
+        else:
+            pts = np.broadcast_to(np.asarray(at, np.float64), (self.E, 2)).copy()
+            fr = c["fissure_radius"]
+            ok = mask & (pts[:, 0] >= fr) & (pts[:, 1] >= fr) & (pts[:, 0] <= c["width"] - fr) & (pts[:, 1] <= c["height"] - fr)
+        idx = np.nonzero(ok)[0]
+        self.fz_pos[idx, slot[idx]] = pts[idx]; self.fz_state[idx, slot[idx]] = 1; self.fz_timer[idx, slot[idx]] = c["fissure_warn"]
+        return ok
 
     def _perturb(self):
         f = self.f
         u = self._u(np.ones(self.E, bool))
         a1 = f["p_food"]; a2 = a1 + f["p_obs"]; a3 = a2 + f["p_vent"]; a4 = a3 + f["p_alert"]
+        a5 = a4 + f["p_plant"]; a6 = a5 + f["p_raise"]; a7 = a6 + f["p_rain"]; a8 = a7 + f["p_fissure"]
         mf = u < a1
         mo = (u >= a1) & (u < a2)
         mv = (u >= a2) & (u < a3)
@@ -347,6 +456,10 @@ class World:
                 self.wake_vent(mv & (k == v), v)
         if ma.any():
             self.alert_predator(ma)
+        for lo, hi, act in ((a4, a5, self.plant_seed), (a5, a6, self.raise_thicket), (a6, a7, self.call_rain), (a7, a8, self.wake_ground)):
+            mk = (u >= lo) & (u < hi)
+            if mk.any():
+                act(mk)
 
     # ----------------------------------------------------------------- predator (world rule, not learned)
     def _los_clear(self, a, b):
@@ -413,7 +526,7 @@ class World:
         for j in range(c["max_obstacles"]):
             p = self._push(p, self.obs_pos[:, j], self.obs_r[:, j] + pr, on & self.obs_on[:, j])
         for s in range(c["max_shelters"]):
-            p = self._push(p, self.sh_pos[:, s], self.sh_r[:, s] + pr, on & self.sh_on[:, s])
+            p = self._push(p, self.sh_pos[:, s], self.sh_r[:, s] + pr, on & self.sh_on[:, s] & (self.sh_h[:, s] > c["cover_min"]))
         p = np.stack([np.clip(p[:, 0], pr, c["width"] - pr), np.clip(p[:, 1], pr, c["height"] - pr)], 1)
         self.pr_pos = np.where(on[:, None], p, self.pr_pos)
         arrived_p = patrol & (_norm(self.pr_pos - self.pr_target) < 0.3)
@@ -453,8 +566,7 @@ class World:
         self.pos = q
         self.contact = contact
         self.ep["dist"] += _norm(q - old); self.ep["contact"] += contact
-        dsh = _norm(self.sh_pos - self.pos[:, None, :])
-        self.in_shelter = np.any(self.sh_on & (dsh < self.sh_r), 1)
+        self.in_shelter = self._cover(self.pos)
         self.in_water = self._in_pool(self.pos)
         self.resting = (a == A_REST) & (self.v < 0.02)
         self.energy -= np.where(self.resting, c["energy_decay_rest"], c["energy_decay"]) + c["move_cost_k"] * self.v * self.v
@@ -463,10 +575,14 @@ class World:
         dst = np.select([dashing, moving, slow, a == A_REST],
                         [c["stamina_dash"], c["stamina_move"], c["stamina_slow"],
                          c["stamina_rest"] + c["stamina_rest_shelter"] * self.in_shelter], 0.0)
+        dst = np.where((dst > 0) & (self.injury > 0), dst * c["injury_recovery"], dst)  # injured bodies recover slowly
         self.stamina = np.clip(self.stamina + dst, 0.0, 1.0)
         reward = np.zeros(self.E)
         dv = _norm(self.vent_pos - self.pos[:, None, :])
-        inh = np.any(self.vent_on & (dv < self.vent_r), 1)
+        dfz = _norm(self.fz_pos - self.pos[:, None, :])
+        inh = np.any(self.vent_on & (dv < self.vent_r), 1) | np.any((self.fz_state == 2) & (dfz < c["fissure_radius"]), 1)
+        self.injury = np.where(inh, c["injury_ticks"], np.maximum(self.injury - 1, 0))
+        self.ep["injury"] += inh
         self.in_hazard = inh
         self.energy -= c["hazard_drain"] * inh
         reward += c["reward_hazard_tick"] * inh
@@ -481,12 +597,14 @@ class World:
                 for e in np.nonzero(eat)[0][:64]:
                     self.events.append((int(e), int(self.t[e]), "eat", i))
                 self.food_on[eat, i] = False
-                self.food_timer[eat, i] = (c["regrow_min"] + np.floor(self._u(eat) * c["regrow_rand"])).astype(np.int64)[eat]
+                self.food_timer[eat, i] = (c["regrow_min"] + np.floor(self._u(eat) * c["regrow_rand"]))[eat]
         for i in range(self.f["food_n"]):  # seeds regrow where the meadow allows, after a delay
             off = ~self.food_on[:, i]
             if not off.any():
                 continue
-            self.food_timer[off, i] -= np.where(self.raining, 2, 1)[off]
+            k = i % self.c["n_meadows"]  # regrowth follows the meadow's fertility cycle and rain; the hollow is richer
+            rate = self.fertility(k) * (self.c["hollow_rate"] if (k == 0 and self.f["n_vents"] > 0) else 1.0)
+            self.food_timer[off, i] -= rate[off]
             grow = off & (self.food_timer[:, i] <= 0)
             if grow.any():
                 self._place_food(grow, i)
@@ -502,11 +620,39 @@ class World:
             if flip.any():
                 self.vent_on[flip, v] = ~self.vent_on[flip, v]
                 self.vent_timer[flip, v] = self._vent_duration(flip, self.vent_on[:, v])[flip]
+        g = c["max_food"] - 1  # planted seed ripens
+        rip = self.plant_timer > 0
+        if rip.any():
+            self.plant_timer[rip] -= 1
+            ready = rip & (self.plant_timer <= 0)
+            self.food_on[ready, g] = True
         self.weather_timer -= 1
         wflip = self.weather_timer <= 0
         if wflip.any():
             self.raining[wflip] = ~self.raining[wflip]
             self.weather_timer[wflip] = self._weather_duration(wflip, self.raining)[wflip]
+        # thickets: dry spells wilt, rain restores; a raised thicket grows, lives, then withers away
+        perm = self.sh_on & (self.sh_life < 0)
+        self.sh_h = np.where(perm, np.clip(self.sh_h + np.where(self.raining, c["thicket_rain_rate"], -c["thicket_dry_rate"])[:, None], 0.0, 1.0), self.sh_h)
+        growing = self.sh_on & (self.sh_life > 0)
+        self.sh_h = np.where(growing, np.minimum(1.0, self.sh_h + 1.0 / c["raised_grow"]), self.sh_h)
+        self.sh_life = np.where(growing, self.sh_life - 1, self.sh_life)
+        dying = self.sh_on & (self.sh_life == 0)
+        self.sh_h = np.where(dying, self.sh_h - 1.0 / c["raised_wither"], self.sh_h)
+        gone = dying & (self.sh_h <= 0)
+        self.sh_on = self.sh_on & ~gone; self.sh_h = np.where(gone, 0.0, self.sh_h); self.sh_life = np.where(gone, -1, self.sh_life)
+        # fissures: warning → open → closed
+        act = self.fz_state > 0
+        self.fz_timer = np.where(act, self.fz_timer - 1, self.fz_timer)
+        opening = (self.fz_state == 1) & (self.fz_timer <= 0)
+        closing = (self.fz_state == 2) & (self.fz_timer <= 0)
+        if opening.any():
+            for j in range(c["max_fissures"]):
+                oj = opening[:, j]
+                if oj.any():
+                    self.fz_timer[oj, j] = (c["fissure_open_min"] + np.floor(self._u(oj) * c["fissure_open_rand"])).astype(np.int64)[oj]
+        self.fz_state = np.where(opening, 2, np.where(closing, 0, self.fz_state))
+        self.in_shelter = self._cover(self.pos)
         caught = self._predator_step()
         threat = self.pr_on & ((self.pr_mode == HUNT) | (self.pr_mode == SEARCH)) & (_norm(self.pos - self.pr_pos) < 6.0)
         night = self.light() < 0.3
@@ -590,14 +736,29 @@ class World:
 
         t_solid = np.minimum(t_wall, circles(self.obs_pos, self.obs_r, self.obs_on))
         t_food = circles(self.food_pos, np.full(self.food_pos.shape[:2], c["food_radius"]), self.food_on)
-        t_haz = circles(self.vent_pos, self.vent_r, self.vent_on)
-        t_sh = circles(self.sh_pos, self.sh_r, self.sh_on)
+        prox = lambda t: 1.0 - np.minimum(t, rng_) / rng_
+
+        def circles_val(cpos, cr, con, val):  # strongest (proximity × value) over items on each ray
+            ox = cpos[:, None, :, 0] - px[:, :, None]
+            oy = cpos[:, None, :, 1] - py[:, :, None]
+            proj = ox * dx[:, :, None] + oy * dy[:, :, None]
+            perp2 = ox * ox + oy * oy - proj * proj
+            r2 = (cr * cr)[:, None, :]
+            hit = con[:, None, :] & (perp2 <= r2)
+            thc = np.sqrt(np.maximum(r2 - perp2, 0.0))
+            t0 = proj - thc; t1 = proj + thc
+            t = np.where(hit, np.where(t0 >= 0, t0, np.where(t1 >= 0, 0.0, np.inf)), np.inf)
+            return (prox(t) * val[:, None, :]).max(axis=2)
+
+        fz_val = np.where(self.fz_state == 2, 1.0, np.where(self.fz_state == 1, c["fissure_warn_signal"], 0.0))
+        v_haz = np.maximum(prox(circles(self.vent_pos, self.vent_r, self.vent_on)),
+                           circles_val(self.fz_pos, np.full(self.fz_state.shape, c["fissure_radius"]), self.fz_state > 0, fz_val))
+        v_sh = circles_val(self.sh_pos, self.sh_r, self.sh_on, self.sh_h)
         t_wat = circles(self.pool_pos, self.pool_r, self.pool_on)
         t_pr = circles(self.pr_pos[:, None, :], np.full((self.E, 1), c["predator_radius"]), self.pr_on[:, None])
         sight = c["pred_sight_night"] + (c["pred_sight_day"] - c["pred_sight_night"]) * light
         t_pr = np.where(t_pr <= sight[:, None], t_pr, np.inf)
-        prox = lambda t: 1.0 - np.minimum(t, rng_) / rng_
-        rays = np.stack([prox(t_solid), prox(t_food), prox(t_haz), prox(t_sh), prox(t_pr), prox(t_wat)], 2).reshape(self.E, R * N_CH)
+        rays = np.stack([prox(t_solid), prox(t_food), v_haz, v_sh, prox(t_pr), prox(t_wat)], 2).reshape(self.E, R * N_CH)
         hr = np.where(self.pr_mode == HUNT, np.where(self.pr_pounce, c["hear_hunt"], c["hear_stalk"]), c["hear_calm"])
         hr = np.where(self.raining, hr * c["rain_hear"], hr)
         rel = self.pr_pos - self.pos
@@ -610,7 +771,8 @@ class World:
         selfv = np.stack([self.energy, self.stamina, self.v / c["v_max"], self.w / c["w_max"], self.in_shelter * 1.0,
                           self.in_hazard * 1.0, self.in_water * 1.0, self.contact * 1.0, light, self.raining * 1.0,
                           np.sin(phase), np.cos(phase),
-                          hp, np.where(heard, np.sin(bearing), 0.0), np.where(heard, np.cos(bearing), 0.0)], 1)
+                          hp, np.where(heard, np.sin(bearing), 0.0), np.where(heard, np.cos(bearing), 0.0),
+                          self.injury / c["injury_ticks"]], 1)
         return np.concatenate([rays, selfv, self.memory_features(), onehot], 1)
 
 

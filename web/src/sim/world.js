@@ -6,7 +6,8 @@ export const SPEC_VERSION = C.world_spec_version;
 export const N_ACTIONS = C.actions.length;
 export const N_CH = 6;
 export const N_MEM = 5;  // memory of Vela's own last predator percept (2.2.0)
-export const OBS_DIM = C.n_rays * N_CH + 15 + N_MEM + N_ACTIONS;
+export const N_SELF = 16;  // 3.0.0: + injury
+export const OBS_DIM = C.n_rays * N_CH + N_SELF + N_MEM + N_ACTIONS;
 export const CONSTANTS = C;
 export const MODES = ["patrol", "hunt", "search", "rest"];
 const TWO_PI = 2 * Math.PI;
@@ -94,7 +95,9 @@ export class World {
     this.seed = seed; this.rng = new Mulberry32(seed);
     const mk = (n, o) => Array.from({ length: n }, () => ({ ...o }));
     this.slates = mk(c.max_obstacles, { x: -100, y: -100, r: 0, on: false });
-    this.shelters = mk(c.max_shelters, { x: -100, y: -100, r: 0, on: false });
+    this.shelters = mk(c.max_shelters, { x: -100, y: -100, r: 0, on: false, h: 0, life: -1 });
+    this.fissures = mk(c.max_fissures, { x: -100, y: -100, state: 0, timer: 0 });
+    this.plantTimer = 0; this.injury = 0;
     this.pools = mk(c.max_pools, { x: -100, y: -100, r: 0, on: false });
     this.vents = mk(c.max_vents, { x: -100, y: -100, r: 0, on: false, present: false, timer: 0 });
     this.meadows = mk(c.n_meadows, { x: -100, y: -100 });
@@ -111,8 +114,8 @@ export class World {
     n = f.sh_min + Math.floor(this.u() * (f.sh_max - f.sh_min + 1));
     for (let s = 0; s < c.max_shelters; s++) {
       if (s >= n) continue;
-      const r = 0.9 + this.u() * 0.4;
-      const [x, y] = this.samplePoint(r + 0.2, (x, y) => this.slatesOk(x, y, r + gap) && this.sheltersOk(x, y, r + 1.0));
+      const r = 0.9 + this.u() * 0.4, wall = r + 2 * pr + 0.05;  // 3.0.0: the predator can pass between a thicket and a wall
+      const [x, y] = this.samplePoint(wall, (x, y) => this.slatesOk(x, y, r + gap) && this.sheltersOk(x, y, r + 1.0));
       Object.assign(this.shelters[s], { x, y, r, on: true });
     }
     n = f.pool_min + Math.floor(this.u() * (f.pool_max - f.pool_min + 1));
@@ -131,11 +134,13 @@ export class World {
       this.vents[v].timer = this.ventDuration(active);
     }
     const nearShelter = (x, y) => this.shelters.some((s) => s.on && norm2(s.x - x, s.y - y) - s.r <= c.meadow_shelter_max);
-    for (const m of this.meadows) {
-      const [x, y] = this.samplePoint(1.5, (x, y) => this.sheltersOk(x, y, c.meadow_shelter_min) && nearShelter(x, y)
+    const hollowOk = (x, y) => { const v = this.vents[0], dv = norm2(v.x - x, v.y - y) - v.r;  // meadow 0: the rich hollow by the first vent
+      return dv >= c.hollow_vent_min && dv <= c.hollow_vent_max && this.sheltersOk(x, y, 1.0) && this.slatesOk(x, y, 0.0) && this.poolsOk(x, y, 1.0); };
+    this.meadows.forEach((m, k) => {
+      const [x, y] = this.samplePoint(1.5, k === 0 && f.n_vents > 0 ? hollowOk : (x, y) => this.sheltersOk(x, y, c.meadow_shelter_min) && nearShelter(x, y)
         && this.slatesOk(x, y, 0.0) && this.poolsOk(x, y, 1.0));
       m.x = x; m.y = y;
-    }
+    });
     const [cx, cy] = this.samplePoint(rc + 0.1, (x, y) => {
       if (!this.slatesOk(x, y, rc + 0.1)) return false;
       for (const v of this.vents) if (v.present && !(norm2(v.x - x, v.y - y) > v.r + rc)) return false;
@@ -156,10 +161,13 @@ export class World {
     this.raining = this.u() < c.rain_start_p;
     this.weatherTimer = this.weatherDuration(this.raining);
     this.inWater = this.inPool(this.x, this.y);
+    if (!f.rain) { this.raining = false; this.weatherTimer = 1e9; }
+    this.meadows.forEach((m) => { m.phase = Math.floor(this.u() * c.fertility_period); });
+    for (const sh of this.shelters) if (sh.on) sh.h = c.thicket_h_min + this.u() * (1 - c.thicket_h_min);
     this.energy = c.energy_start; this.stamina = 1.0; this.v = 0.0; this.w = 0.0;
     this.t = 0; this.lastAction = A_REST;
     this.contact = false; this.inHazard = false; this.resting = false;
-    this.inShelter = this.shelters.some((s) => s.on && norm2(s.x - this.x, s.y - this.y) < s.r);
+    this.inShelter = this.cover(this.x, this.y);
     this.epFood = 0; this.dead = false; this.caught = false; this.truncated = false;
     this.events = [];
     this.memT = 1000000; this.memX = 0; this.memY = 0; this.memPounce = false;
@@ -194,14 +202,60 @@ export class World {
     this.food[i].x = x; this.food[i].y = y; return true;
   }
   wakeVent(v) { if (!this.vents[v].present) return false; this.vents[v].on = true; this.vents[v].timer = 300; return true; }
-  alertPredator() {
+  alertPredator(at = null) {  // a disturbance: the predator searches a point (default: where Vela is); a visitor lure picks the point
     const p = this.pred;
     if (!p.on || p.mode === REST) return false;
-    p.mode = SEARCH; p.lx = this.x; p.ly = this.y; p.timer = this.c.predator_search_ticks; return true;
+    p.mode = SEARCH; p.lx = at ? at[0] : this.x; p.ly = at ? at[1] : this.y; p.timer = this.c.predator_search_ticks; return true;
+  }
+  cover(x, y) { const cm = this.c.cover_min; return this.shelters.some((s) => s.on && s.h > cm && norm2(s.x - x, s.y - y) < s.r); }
+  fertility(k) {
+    const c = this.c, cyc = 0.5 + 0.5 * Math.sin((TWO_PI * (this.t + this.meadows[k].phase)) / c.fertility_period);
+    return c.fertility_floor + c.fertility_gain * cyc + c.rain_fertility * (this.raining ? 1 : 0);
+  }
+  plantSeed(at = null) {
+    const c = this.c, g = c.max_food - 1, rf = c.food_radius, fd = this.food[g];
+    if (fd.on || this.plantTimer > 0) return false;
+    const clear = (x, y) => this.slatesOk(x, y, rf + 0.1) && this.notInVents(x, y) && this.sheltersOk(x, y, rf) && this.poolsOk(x, y, rf)
+      && norm2(x - this.x, y - this.y) > 1.0;
+    let x, y, ok;
+    if (at === null) [x, y, ok] = this.samplePoint(0.5, clear);
+    else { [x, y] = at; ok = x >= 0.5 && y >= 0.5 && x <= c.width - 0.5 && y <= c.height - 0.5 && clear(x, y); }
+    if (!ok) return false;
+    fd.x = x; fd.y = y; this.plantTimer = c.seed_ripen; this.emit("plant", { x, y }); return true;
+  }
+  raiseThicket(at = null) {
+    const c = this.c, sh = this.shelters[c.max_shelters - 1], r = c.raised_radius, wall = r + 2 * c.predator_radius + 0.05;
+    if (sh.on) return false;
+    const clear = (x, y) => this.slatesOk(x, y, r + 0.2) && this.sheltersOk(x, y, r + 0.5) && this.poolsOk(x, y, r);
+    let x, y, ok;
+    if (at === null) [x, y, ok] = this.samplePoint(wall, clear);
+    else { [x, y] = at; ok = x >= wall && y >= wall && x <= c.width - wall && y <= c.height - wall && clear(x, y); }
+    if (!ok) return false;
+    Object.assign(sh, { x, y, r, on: true, h: 0, life: c.raised_life }); this.emit("raise", { x, y }); return true;
+  }
+  callRain() {
+    if (this.raining) return false;
+    this.raining = true; this.weatherTimer = this.weatherDuration(true); this.emit("rain_start"); return true;
+  }
+  wakeGround(at = null) {
+    const c = this.c, f = this.f, slot = this.fissures.findIndex((z) => z.state === 0);
+    if (slot < 0) return false;
+    let x, y;
+    if (at === null) {
+      if (f.n_vents <= 0) return false;
+      const k = Math.min(Math.floor(this.u() * f.n_vents), f.n_vents - 1), ang = this.u() * TWO_PI, v = this.vents[k];
+      const dist = v.r + c.fissure_vent_min + this.u() * (c.fissure_vent_max - c.fissure_vent_min), fr = c.fissure_radius;
+      x = clamp(v.x + dist * Math.cos(ang), fr, c.width - fr); y = clamp(v.y + dist * Math.sin(ang), fr, c.height - fr);
+    } else {
+      [x, y] = at; const fr = c.fissure_radius;
+      if (!(x >= fr && y >= fr && x <= c.width - fr && y <= c.height - fr)) return false;
+    }
+    Object.assign(this.fissures[slot], { x, y, state: 1, timer: c.fissure_warn }); this.emit("fissure_warning", { x, y }); return true;
   }
   perturb() {
     const f = this.f, u = this.u();
     const a1 = f.p_food, a2 = a1 + f.p_obs, a3 = a2 + f.p_vent, a4 = a3 + f.p_alert;
+    const a5 = a4 + f.p_plant, a6 = a5 + f.p_raise, a7 = a6 + f.p_rain, a8 = a7 + f.p_fissure;
     if (u < a1) {
       const k = Math.min(Math.floor(this.u() * f.food_n), f.food_n - 1);
       if (this.food[k].on) this.placeFood(k);
@@ -209,6 +263,10 @@ export class World {
     else if (u < a3) {
       if (f.n_vents > 0) { const k = Math.min(Math.floor(this.u() * f.n_vents), f.n_vents - 1); this.wakeVent(k); }
     } else if (u < a4) this.alertPredator();
+    else if (u < a5) this.plantSeed();
+    else if (u < a6) this.raiseThicket();
+    else if (u < a7) this.callRain();
+    else if (u < a8) this.wakeGround();
   }
 
   losClear(ax, ay, bx, by) {
@@ -264,7 +322,7 @@ export class World {
     const pr = c.predator_radius;
     let px = p.x, py = p.y, q;
     for (const o of this.slates) if (o.on && (q = World.push(px, py, o.x, o.y, o.r + pr))) [px, py] = q;
-    for (const s of this.shelters) if (s.on && (q = World.push(px, py, s.x, s.y, s.r + pr))) [px, py] = q;
+    for (const s of this.shelters) if (s.on && s.h > c.cover_min && (q = World.push(px, py, s.x, s.y, s.r + pr))) [px, py] = q;
     p.x = clamp(px, pr, c.width - pr); p.y = clamp(py, pr, c.height - pr);
     const arrived = patrol && norm2(p.x - p.tx, p.y - p.ty) < 0.3;
     const endS = search && (p.timer <= 0 || norm2(p.x - p.lx, p.y - p.ly) < 0.3);
@@ -296,17 +354,20 @@ export class World {
     if (qx !== px || qy !== py) contact = true;
     this.x = qx; this.y = qy; this.contact = contact;
     const wasSheltered = this.inShelter;
-    this.inShelter = this.shelters.some((s) => s.on && norm2(s.x - this.x, s.y - this.y) < s.r);
+    this.inShelter = this.cover(this.x, this.y);
     this.inWater = this.inPool(this.x, this.y);
     this.resting = a === A_REST && this.v < 0.02;
     this.energy -= (this.resting ? c.energy_decay_rest : c.energy_decay) + c.move_cost_k * this.v * this.v;
     const moving = a <= 2 || (a === A_DASH && !canDash), slow = a >= 4 && a <= 6;
     const dst = dashing ? c.stamina_dash : moving ? c.stamina_move : slow ? c.stamina_slow
       : a === A_REST ? c.stamina_rest + c.stamina_rest_shelter * (this.inShelter ? 1 : 0) : 0.0;
-    this.stamina = clamp(this.stamina + dst, 0.0, 1.0);
+    this.stamina = clamp(this.stamina + (dst > 0 && this.injury > 0 ? dst * c.injury_recovery : dst), 0.0, 1.0);
     let reward = 0;
     let inh = false;
     for (const v of this.vents) if (v.on && norm2(v.x - this.x, v.y - this.y) < v.r) inh = true;
+    for (const z of this.fissures) if (z.state === 2 && norm2(z.x - this.x, z.y - this.y) < c.fissure_radius) inh = true;
+    if (inh && this.injury === 0) this.emit("injured");
+    this.injury = inh ? c.injury_ticks : Math.max(this.injury - 1, 0);
     this.inHazard = inh;
     if (inh) { this.energy -= c.hazard_drain; reward += c.reward_hazard_tick; }
     for (let i = 0; i < c.max_food; i++) {
@@ -322,7 +383,8 @@ export class World {
     for (let i = 0; i < this.f.food_n; i++) {
       const fd = this.food[i];
       if (fd.on) continue;
-      fd.timer -= this.raining ? 2 : 1;
+      const k = i % this.c.n_meadows;
+      fd.timer -= this.fertility(k) * (k === 0 && this.f.n_vents > 0 ? this.c.hollow_rate : 1.0);
       if (fd.timer <= 0) { this.placeFood(i); fd.on = true; this.emit("grow", { index: i, x: fd.x, y: fd.y }); }
     }
     for (const v of this.vents) {
@@ -330,8 +392,26 @@ export class World {
       v.timer -= 1;
       if (v.timer <= 0) { v.on = !v.on; v.timer = this.ventDuration(v.on); }
     }
+    if (this.plantTimer > 0) { this.plantTimer -= 1; if (this.plantTimer <= 0) { const g = this.food[c.max_food - 1]; g.on = true; this.emit("grow", { index: c.max_food - 1, x: g.x, y: g.y }); } }
     this.weatherTimer -= 1;
     if (this.weatherTimer <= 0) { this.raining = !this.raining; this.weatherTimer = this.weatherDuration(this.raining); this.emit(this.raining ? "rain_start" : "rain_end"); }
+    for (const sh of this.shelters) {  // thickets: dry spells wilt, rain restores; raised thickets grow, live, wither
+      if (!sh.on) continue;
+      if (sh.life < 0) sh.h = clamp(sh.h + (this.raining ? c.thicket_rain_rate : -c.thicket_dry_rate), 0.0, 1.0);
+      else {
+        if (sh.life > 0) { sh.h = Math.min(1.0, sh.h + 1.0 / c.raised_grow); sh.life -= 1; }
+        if (sh.life === 0) { sh.h = sh.h - 1.0 / c.raised_wither; if (sh.h <= 0) { sh.on = false; sh.h = 0; sh.life = -1; this.emit("thicket_gone", { x: sh.x, y: sh.y }); } }
+      }
+    }
+    for (const z of this.fissures) {  // warning → open → closed
+      if (z.state === 0) continue;
+      z.timer -= 1;
+      if (z.timer <= 0) {
+        if (z.state === 1) { z.state = 2; z.timer = c.fissure_open_min + Math.floor(this.u() * c.fissure_open_rand); this.emit("fissure_open", { x: z.x, y: z.y }); }
+        else { z.state = 0; this.emit("fissure_closed", { x: z.x, y: z.y }); }
+      }
+    }
+    this.inShelter = this.cover(this.x, this.y);
     const prevMode = this.pred.mode;
     const caught = this.predatorStep();
     if (this.pred.on && this.pred.mode !== prevMode) this.emit("predator_mode", { from: MODES[prevMode], to: MODES[this.pred.mode] });
@@ -399,11 +479,13 @@ export class World {
       ts = Math.min(Math.min(tx, ty), ts);
       for (const fd of this.food) if (fd.on) tf = circle(tf, fd.x, fd.y, c.food_radius, dx, dy);
       for (const v of this.vents) if (v.on) th = circle(th, v.x, v.y, v.r, dx, dy);
-      for (const s of this.shelters) if (s.on) tsh = circle(tsh, s.x, s.y, s.r, dx, dy);
+      let vHaz = prox(th), vSh = 0;
+      for (const z of this.fissures) if (z.state > 0) { const t = circle(Infinity, z.x, z.y, c.fissure_radius, dx, dy); vHaz = Math.max(vHaz, prox(t) * (z.state === 2 ? 1.0 : c.fissure_warn_signal)); }
+      for (const s of this.shelters) if (s.on) { const t = circle(Infinity, s.x, s.y, s.r, dx, dy); vSh = Math.max(vSh, prox(t) * s.h); }
       if (p.on) { tp = circle(tp, p.x, p.y, c.predator_radius, dx, dy); if (!(tp <= sight)) tp = Infinity; }
       for (const q of this.pools) if (q.on) tw = circle(tw, q.x, q.y, q.r, dx, dy);
       const b = N_CH * k;
-      out[b] = prox(ts); out[b + 1] = prox(tf); out[b + 2] = prox(th); out[b + 3] = prox(tsh); out[b + 4] = prox(tp); out[b + 5] = prox(tw);
+      out[b] = prox(ts); out[b + 1] = prox(tf); out[b + 2] = vHaz; out[b + 3] = vSh; out[b + 4] = prox(tp); out[b + 5] = prox(tw);
     }
     let hr = p.mode === HUNT ? (p.pounce ? c.hear_hunt : c.hear_stalk) : c.hear_calm;
     if (this.raining) hr = hr * c.rain_hear;
@@ -414,7 +496,7 @@ export class World {
     const S = N_CH * R;
     const selfv = [this.energy, this.stamina, this.v / c.v_max, this.w / c.w_max, this.inShelter ? 1 : 0, this.inHazard ? 1 : 0,
       this.inWater ? 1 : 0, this.contact ? 1 : 0, light, this.raining ? 1 : 0, Math.sin(phase), Math.cos(phase),
-      heard ? 1.0 - dpr / hr : 0.0, heard ? Math.sin(bearing) : 0.0, heard ? Math.cos(bearing) : 0.0];
+      heard ? 1.0 - dpr / hr : 0.0, heard ? Math.sin(bearing) : 0.0, heard ? Math.cos(bearing) : 0.0, this.injury / c.injury_ticks];
     for (let i = 0; i < selfv.length; i++) out[S + i] = selfv[i];
     const mem = this.memoryFeatures();
     for (let i = 0; i < N_MEM; i++) out[S + selfv.length + i] = mem[i];
@@ -427,7 +509,8 @@ export class World {
     return { t: this.t, x: this.x, y: this.y, heading: this.heading, v: this.v, w: this.w, energy: this.energy, stamina: this.stamina,
       contact: this.contact, inHazard: this.inHazard, inShelter: this.inShelter, inWater: this.inWater, resting: this.resting,
       light: this.light(), raining: this.raining, slates: on(this.slates), shelters: on(this.shelters), pools: on(this.pools),
-      vents: this.vents.filter((v) => v.present).map((v) => ({ ...v })), food: on(this.food), meadows: this.meadows.map((m) => ({ ...m })),
+      vents: this.vents.filter((v) => v.present).map((v) => ({ ...v })), food: on(this.food), meadows: this.meadows.map((m, k) => ({ ...m, fertility: this.fertility(k) })),
+      fissures: this.fissures.filter((z) => z.state > 0).map((z) => ({ ...z })), plantTimer: this.plantTimer, injury: this.injury,
       pred: { ...this.pred, mode: MODES[this.pred.mode] }, epFood: this.epFood, dead: this.dead, caught: this.caught };
   }
 }

@@ -11,9 +11,11 @@ from genesis.world import World
 
 ROOT = ckpt.ROOT
 OUT = ROOT / "web" / "test" / "fixtures"
-FAMS = ["standard", "perturbed", "night", "unseen_layout", "relentless", "one_shelter", "no_predator", "train"]
+FAMS = ["standard", "perturbed", "night", "unseen_layout", "relentless", "one_shelter", "no_predator", "train", "drought", "fissure_heavy", "lure_heavy"]
 EVENTS = {100: ("insert_obstacle", 0.6, [8.0, 5.0]), 150: ("alert_predator",), 200: ("wake_vent", 0),
-          300: ("move_food", 0, [3.0, 3.0]), 350: ("insert_obstacle", 0.5, [18.0, 12.5]), 500: ("alert_predator",)}
+          300: ("move_food", 0, [3.0, 3.0]), 350: ("insert_obstacle", 0.5, [18.0, 12.5]), 500: ("alert_predator",),
+          420: ("plant", [12.0, 8.0]), 450: ("raise", [6.0, 6.0]), 480: ("rain",), 520: ("lure", [20.0, 4.0]), 560: ("wake", [10.0, 10.0]),
+          600: ("plant", None), 640: ("raise", None), 700: ("wake", None)}
 
 
 def world_fixture(k, steps=900):
@@ -33,6 +35,16 @@ def world_fixture(k, steps=900):
                 accepted[t] = bool(w.wake_vent(one, ev[1])[0])
             elif ev[0] == "alert_predator":
                 accepted[t] = bool(w.alert_predator(one)[0])
+            elif ev[0] == "plant":
+                accepted[t] = bool(w.plant_seed(one, at=ev[1])[0])
+            elif ev[0] == "raise":
+                accepted[t] = bool(w.raise_thicket(one, at=ev[1])[0])
+            elif ev[0] == "rain":
+                accepted[t] = bool(w.call_rain(one)[0])
+            elif ev[0] == "lure":
+                accepted[t] = bool(w.alert_predator(one, at=ev[1])[0])
+            elif ev[0] == "wake":
+                accepted[t] = bool(w.wake_ground(one, at=ev[1])[0])
             else:
                 accepted[t] = bool(w.move_food(one, ev[1], ev[2])[0])
         w.step(acts[t:t + 1])
@@ -56,7 +68,7 @@ def policy_fixture(d, n=1000):
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT / "genesis" / "world_constants.json", ROOT / "web" / "src" / "sim" / "world_constants.json")
-    for k in range(20):
+    for k in range(22):
         (OUT / f"world-{k:02d}.json").write_text(json.dumps(world_fixture(k)))
     if "--policy" in sys.argv:
         d = Path(sys.argv[sys.argv.index("--policy") + 1])

@@ -6,7 +6,7 @@ import numpy as np
 from genesis.world import C, World
 from genesis.evalonly.baselines import forager_policy, random_policy, survivor_policy
 
-FAMILIES = ["standard", "unseen_layout", "night", "relentless", "one_shelter", "perturbed", "no_predator"]
+FAMILIES = ["standard", "unseen_layout", "night", "relentless", "one_shelter", "perturbed", "no_predator", "drought", "fissure_heavy", "lure_heavy"]
 FAMILY_OFFSET = {f: i * 100_000 for i, f in enumerate(FAMILIES)}
 
 

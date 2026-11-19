@@ -18,13 +18,13 @@ from genesis.world import C, N_ACTIONS, OBS_DIM, SPEC_VERSION, VecEnv
 
 RUNS = ckpt.ROOT / "runs"
 DEFAULT_CONFIG = {
-    "n_envs": 256, "n_steps": 128, "epochs": 4, "minibatch": 2048, "lr": 3e-4, "gamma": 0.99, "lam": 0.95,
+    "n_envs": 256, "n_steps": 128, "epochs": 4, "minibatch": 2048, "lr": 3e-4, "gamma": 0.997, "lam": 0.95,
     "clip": 0.2, "ent_coef": 0.01, "vf_coef": 0.5, "max_grad_norm": 0.5, "hidden": [128, 128],
     "total_steps": 60_000_000, "segment_minutes": 60, "ckpt_minutes": 10, "first_ckpt_s": 45,
     "publish_minutes": 30, "heartbeat_s": 30, "eval_every_steps": 2_000_000, "eval_episodes": 100,
     "target_survival": 0.9, "plateau_evals": 10, "plateau_eps": 15.0, "seed": 1,
     "rss_soft_mb": 1400, "rss_hard_mb": 1600, "host_min_avail_frac": 0.10,
-    "milestone_steps": {"early": 2_000_000}, "obs_mask": [],
+    "milestone_steps": {"early": 2_000_000}, "obs_mask": [], "train_family": "train",
 }
 
 
@@ -59,7 +59,7 @@ class Trainer:
         self.peak_rss = 0.0
         self.parent = parent
         rng = np.random.default_rng(cfg["seed"])
-        self.env = VecEnv(cfg["n_envs"], "train", seed=cfg["seed"] + 1000)
+        self.env = VecEnv(cfg["n_envs"], cfg.get("train_family", "train"), seed=cfg["seed"] + 1000)
         self.act_rng = np.random.default_rng(cfg["seed"] + 2000)
         if resume_from is None:
             self.params = ppo.init_params(OBS_DIM, N_ACTIONS, cfg["hidden"], seed=cfg["seed"])

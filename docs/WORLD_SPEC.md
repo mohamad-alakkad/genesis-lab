@@ -1,6 +1,6 @@
 # GENESIS world specification
 
-**Version:** 2.2.0 · **Status:** frozen for lineage gen4 · **Changelog:** 2.2.0 adds 5 memory inputs (Vela's own last predator percept; updated at the end of each step/reset; obs 89 → 94) · 1.0.0 seeds/vents/slates, tag `v1-baseline` · 2.0.0 living world (gen2) · 2.1.0 meadows at thicket edges (2–4 u from a shelter edge), stalk hearing 1.5 → 2.5 (gen2 never discovered hiding: 0.3% shelter use under threat)
+**Version:** 3.0.0 · **Status:** frozen for lineage gen5 · **Changelog:** 3.0.0 living ecology (see §10) · 2.2.0 adds 5 memory inputs (Vela's own last predator percept; updated at the end of each step/reset; obs 89 → 94) · 1.0.0 seeds/vents/slates, tag `v1-baseline` · 2.0.0 living world (gen2) · 2.1.0 meadows at thicket edges (2–4 u from a shelter edge), stalk hearing 1.5 → 2.5 (gen2 never discovered hiding: 0.3% shelter use under threat)
 
 All numbers live in `genesis/world_constants.json`, shared byte-for-byte with the JS port. Reference implementation: `genesis/world.py`. Coordinates: x right, y **down**.
 
@@ -62,3 +62,14 @@ One draw u per tick: u < p_food → relocate a random live seed · then p_obs �
 
 ## 9. Numerics and parity
 float64 world and policy in both implementations; tolerances: observations 1e-6, logits 1e-4. The predator uses atan2 for heading only (presentation); its movement uses normalized vectors.
+
+## 10. World 3.0.0 — the living ecology (adds to everything above)
+Every rule has a cause, a warning the creature can sense, and a consequence. Each visitor act is also done by nature (perturbation channel), so the policy has met it in training.
+- **Meadow fertility:** meadow k has a phase φ_k (drawn at reset) and fertility = 0.35 + 1.3·(½ + ½ sin 2π(t + φ_k)/900) + 0.35·raining. An eaten seed's regrowth timer falls by that rate per tick (×1.6 in the **rich hollow**, meadow 0, placed 1.0–2.5 u from the first vent's edge with no thicket within 1 u).
+- **Thickets:** health h ∈ [0, 1] (drawn 0.7–1.0 at reset). Dry ticks −0.0008, rain +0.004. Cover (invisible, uncatchable, predator pushed out) only while h > 0.35. Shelter ray channel = proximity × h. Thickets keep ≥ r + 0.75 u from walls (the predator always fits).
+- **Fissures (≤ 2):** warning 40 ticks (vent channel shows proximity × 0.4) → open 100–199 ticks (vent channel full; contact drains like a vent) → closed. Nature opens them 0.6–2.5 u beyond a vent's edge.
+- **Injury:** vent or open fissure contact sets injury = 50 ticks; while injured, stamina recovery is halved. Input 81 = injury/50.
+- **Acts (nature rates per tick in training; visitors choose where/when):** plant a seed (slot 9, ripens in 30 ticks) · raise a thicket (slot 4, r 1.0, grows 40, lives 300, withers 60) · call the rain · lure the predator to a point · wake the ground (a fissure with its warning).
+- **Observations:** 95 = 66 rays + 16 self (…, 81 injury) + 5 memory (82–86) + 8 last action (87–94). `in shelter` (70) means effective cover.
+- **Families added:** drought (no rain), fissure_heavy, lure_heavy, train_broad (predator 0.10–0.17, faster than Vela's cruise 0.12).
+- **Draw order additions at reset:** after weather → meadow phases (per meadow) → thicket health (per placed thicket). Per tick: eat (regrow draw) → regrowth → vents → planted-seed ripening → weather → thickets → fissures (open-duration draw, slot order) → predator → perturbation (a1…a8: food, slate, vent, alert, plant, raise, rain, fissure).

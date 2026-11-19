@@ -26,6 +26,11 @@ for (const f of files) {
         if (ev[0] === "insert_obstacle") ok = w.insertObstacle(ev[1], ev[2]);
         else if (ev[0] === "wake_vent") ok = w.wakeVent(ev[1]);
         else if (ev[0] === "alert_predator") ok = w.alertPredator();
+        else if (ev[0] === "plant") ok = w.plantSeed(ev[1]);
+        else if (ev[0] === "raise") ok = w.raiseThicket(ev[1]);
+        else if (ev[0] === "rain") ok = w.callRain();
+        else if (ev[0] === "lure") ok = w.alertPredator(ev[1]);
+        else if (ev[0] === "wake") ok = w.wakeGround(ev[1]);
         else ok = w.moveFood(ev[1], ev[2][0], ev[2][1]);
         assert.strictEqual(ok, fx.accepted[String(t)], `${f} event ${t}`);
       }

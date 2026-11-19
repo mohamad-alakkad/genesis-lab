@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from genesis.world import C, HUNT, OBS_DIM, REST, VecEnv, World
+from genesis.world import C, HUNT, OBS_DIM, REST, SEARCH, VecEnv, World
 
 
 def make(n=32, fam="train", seed0=100):
@@ -55,7 +55,8 @@ def test_no_tunnelling_and_predator_outside_shelters():
         d = np.linalg.norm(w.obs_pos - w.pos[:, None], axis=2)
         assert np.all(~w.obs_on | (d > w.obs_r + rc - 0.25))
         ds = np.linalg.norm(w.sh_pos - w.pr_pos[:, None], axis=2)
-        assert np.all(~w.sh_on | ~w.pr_on[:, None] | (ds > w.sh_r + pr - 0.25))
+        eff = w.sh_on & (w.sh_h > C["cover_min"])  # only healthy thickets keep the predator out (3.0.0)
+        assert np.all(~eff | ~w.pr_on[:, None] | (ds > w.sh_r + pr - 0.25))
         w.energy[:] = 1.0; w.stamina[:] = 1.0
 
 
@@ -87,18 +88,22 @@ def test_stamina_exhaustion_and_rest_recovery():
     assert w.stamina[0] > s + 0.1
 
 
-def test_eating_reward_and_regrowth_delay():
+def test_eating_reward_and_regrowth_follows_fertility():
     w = quiet(World(1, "train")); w.reset(np.ones(1, bool), np.array([9])); quiet(w)
-    w.food_pos[0, 0] = w.pos[0]
+    w.food_pos[0, 1] = w.pos[0]
     w.energy[:] = 0.5
     r, _, _ = w.step(np.array([7]))
-    assert r[0] == C["reward_food"] and not w.food_on[0, 0]
-    for _ in range(C["regrow_min"] - 2):
-        w.step(np.array([7]))
-    assert not w.food_on[0, 0]
-    for _ in range(C["regrow_rand"] + 2):
-        w.step(np.array([7]))
-    assert w.food_on[0, 0]
+    assert r[0] == C["reward_food"] and not w.food_on[0, 1]
+    t0 = w.food_timer[0, 1]
+    k = 1 % C["n_meadows"]; rate = w.fertility(k)[0]
+    w.step(np.array([7]))
+    assert abs((t0 - w.food_timer[0, 1]) - rate) < 1e-9          # timer falls at the meadow's fertility rate
+    assert C["fertility_floor"] <= rate <= C["fertility_floor"] + C["fertility_gain"] + C["rain_fertility"]
+    for _ in range(2000):
+        w.step(np.array([7])); w.energy[:] = 1.0
+        if w.food_on[0, 1]:
+            break
+    assert w.food_on[0, 1]
 
 
 def test_shelter_protects_and_predator_catches_in_open():
@@ -156,3 +161,51 @@ def test_memory_of_last_predator_percept():
     m2 = w.observe()[0, -8 - N_MEM:-8]
     assert abs(m2[0] - np.exp(-60 / C["memory_tau"])) < 1e-9  # recency decays exactly
     assert np.all(np.abs(m2) <= 1.0)
+
+
+def test_thicket_wilts_in_drought_and_stops_hiding():
+    w = World(1, "drought"); w.reset(np.ones(1, bool), np.array([31]))
+    w.f = dict(w.f, p_food=0, p_obs=0, p_vent=0, p_alert=0, p_plant=0, p_raise=0, p_rain=0, p_fissure=0)
+    sl = int(np.argmax(w.sh_on[0])); w.pos[0] = w.sh_pos[0, sl]; w.vent_on[:] = False
+    w.step(np.array([7])); assert w.in_shelter[0]
+    for _ in range(1500):
+        w.step(np.array([7])); w.energy[:] = 1.0
+    assert w.sh_h[0, sl] <= C["cover_min"] and not w.in_shelter[0]       # a wilted thicket hides nothing
+
+
+def test_fissure_warns_then_opens_and_injures():
+    w = World(1, "standard"); w.reset(np.ones(1, bool), np.array([33]))
+    w.f = dict(w.f, p_food=0, p_obs=0, p_vent=0, p_alert=0, p_plant=0, p_raise=0, p_rain=0, p_fissure=0)
+    w.vent_on[:] = False; w.pr_on[:] = False
+    assert w.wake_ground(np.ones(1, bool), at=w.pos[0] + np.array([0.2, 0.0]))[0]
+    assert w.fz_state[0, 0] == 1
+    o = w.observe()[0]; assert 0 < o[2::6][:11].max() <= C["fissure_warn_signal"] + 1e-9   # warning is sensed, weaker than open
+    e0 = w.energy[0]
+    for _ in range(C["fissure_warn"] + 1):  # opens at the end of tick fissure_warn; hurts from the next tick
+        w.step(np.array([7]))
+    assert w.fz_state[0, 0] == 2 and w.in_hazard[0] and w.injury[0] == C["injury_ticks"]
+
+
+def test_planted_seed_ripens_and_raised_thicket_grows_then_withers():
+    w = quiet(World(1, "train")); w.reset(np.ones(1, bool), np.array([35])); quiet(w)
+    w.f = dict(w.f, p_plant=0, p_raise=0, p_rain=0, p_fissure=0)
+    g = C["max_food"] - 1
+    assert w.plant_seed(np.ones(1, bool))[0] and not w.food_on[0, g]
+    for _ in range(C["seed_ripen"]):
+        w.step(np.array([7]))
+    assert w.food_on[0, g]
+    sl = C["max_shelters"] - 1
+    assert w.raise_thicket(np.ones(1, bool))[0] and w.sh_h[0, sl] == 0.0
+    for _ in range(C["raised_grow"]):
+        w.step(np.array([7])); w.energy[:] = 1.0
+    assert w.sh_h[0, sl] >= 1.0 - 1e-9
+    for _ in range(C["raised_life"] + C["raised_wither"] + 5):
+        w.step(np.array([7])); w.energy[:] = 1.0
+    assert not w.sh_on[0, sl]
+
+
+def test_lure_sends_predator_to_a_chosen_point():
+    w = World(1, "standard"); w.reset(np.ones(1, bool), np.array([37]))
+    pt = np.array([3.0, 3.0]); w.pr_mode[:] = 0
+    assert w.alert_predator(np.ones(1, bool), at=pt)[0]
+    assert w.pr_mode[0] == SEARCH and np.allclose(w.pr_last[0], pt)
